@@ -38,6 +38,7 @@ const routerMap = {
   topup: '/console/topup',
   user: '/console/user',
   subscription: '/console/subscription',
+  lottery: '/console/lottery',
   log: '/console/log',
   midjourney: '/console/midjourney',
   setting: '/console/setting',
@@ -181,6 +182,12 @@ const SiderBar = ({ onNavigate = () => {} }) => {
         text: t('用户管理'),
         itemKey: 'user',
         to: '/user',
+        className: isAdmin() ? '' : 'tableHiddle',
+      },
+      {
+        text: t('抽奖活动'),
+        itemKey: 'lottery',
+        to: '/lottery',
         className: isAdmin() ? '' : 'tableHiddle',
       },
       {

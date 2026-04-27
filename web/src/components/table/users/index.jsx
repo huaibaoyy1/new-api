@@ -83,12 +83,19 @@ const UsersPage = () => {
           <UsersDescription
             compactMode={compactMode}
             setCompactMode={setCompactMode}
+            summary={usersData.activitySummary}
             t={t}
           />
         }
         actionsArea={
           <div className='flex flex-col md:flex-row justify-between items-center gap-2 w-full'>
-            <UsersActions setShowAddUser={setShowAddUser} t={t} />
+            <UsersActions
+              setShowAddUser={setShowAddUser}
+              exportActivityCSV={usersData.exportActivityCSV}
+              selectedUserIds={usersData.selectedUserIds}
+              batchManageUsers={usersData.batchManageUsers}
+              t={t}
+            />
 
             <UsersFilters
               formInitValues={formInitValues}
@@ -111,6 +118,7 @@ const UsersPage = () => {
           onPageChange: usersData.handlePageChange,
           onPageSizeChange: usersData.handlePageSizeChange,
           isMobile: isMobile,
+          pageSizePopupPosition: 'top',
           t: usersData.t,
         })}
         t={usersData.t}

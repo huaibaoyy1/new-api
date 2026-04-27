@@ -27,7 +27,12 @@ import {
   Timeline,
 } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
-import { API, showError, getRelativeTime } from '../../helpers';
+import {
+  API,
+  showError,
+  getRelativeTime,
+  getUserIdFromLocalStorage,
+} from '../../helpers';
 import { marked } from 'marked';
 import {
   IllustrationNoContent,
@@ -46,6 +51,7 @@ const NoticeModal = ({
   const { t } = useTranslation();
   const [noticeContent, setNoticeContent] = useState('');
   const [loading, setLoading] = useState(false);
+  const [markingRead, setMarkingRead] = useState(false);
   const [activeTab, setActiveTab] = useState(defaultTab);
 
   const [statusState] = useContext(StatusContext);
@@ -55,7 +61,7 @@ const NoticeModal = ({
   const unreadSet = useMemo(() => new Set(unreadKeys), [unreadKeys]);
 
   const getKeyForItem = (item) =>
-    `${item?.publishDate || ''}-${(item?.content || '').slice(0, 30)}`;
+    `${item?.id || ''}-${item?.publishDate || ''}-${(item?.content || '').slice(0, 30)}`;
 
   const processedAnnouncements = useMemo(() => {
     return (announcements || []).slice(0, 20).map((item) => {
@@ -76,10 +82,62 @@ const NoticeModal = ({
     });
   }, [announcements, unreadSet]);
 
+  const markAnnouncementsRead = async () => {
+    const unreadAnnouncementIds = (announcements || [])
+      .filter((item) => unreadSet.has(getKeyForItem(item)) && item?.id)
+      .map((item) => item.id);
+    if (unreadAnnouncementIds.length === 0) {
+      return;
+    }
+    try {
+      setMarkingRead(true);
+      await Promise.all(
+        unreadAnnouncementIds.map((announcementId) =>
+          API.post('/api/announcements/read', {
+            announcement_id: announcementId,
+          }),
+        ),
+      );
+    } catch (error) {
+      showError(error.message);
+    } finally {
+      setMarkingRead(false);
+    }
+  };
+
   const handleCloseTodayNotice = () => {
     const today = new Date().toDateString();
     localStorage.setItem('notice_close_date', today);
+
+    const unreadKeysToSave = (announcements || [])
+      .filter((item) => unreadSet.has(getKeyForItem(item)))
+      .map(getKeyForItem);
+
+    if (unreadKeysToSave.length > 0) {
+      try {
+        const raw = localStorage.getItem('notice_read_keys');
+        const existingKeys = raw ? JSON.parse(raw) : [];
+        const nextKeys = Array.from(
+          new Set([
+            ...(Array.isArray(existingKeys) ? existingKeys : []),
+            ...unreadKeysToSave,
+          ]),
+        );
+        localStorage.setItem('notice_read_keys', JSON.stringify(nextKeys));
+      } catch {
+        localStorage.setItem(
+          'notice_read_keys',
+          JSON.stringify(unreadKeysToSave),
+        );
+      }
+    }
+
     onClose();
+
+    const userId = getUserIdFromLocalStorage();
+    if (userId && userId > 0) {
+      void markAnnouncementsRead();
+    }
   };
 
   const displayNotice = async () => {
@@ -189,7 +247,7 @@ const NoticeModal = ({
               >
                 <div>
                   <div
-                    className={item.isUnread ? 'shine-text' : ''}
+                    className={item.isUnread ? 'unread-announcement' : ''}
                     dangerouslySetInnerHTML={{ __html: htmlContent }}
                   />
                 </div>
@@ -237,10 +295,10 @@ const NoticeModal = ({
       onCancel={onClose}
       footer={
         <div className='flex justify-end'>
-          <Button type='secondary' onClick={handleCloseTodayNotice}>
+          <Button type='secondary' onClick={handleCloseTodayNotice} loading={markingRead}>
             {t('今日关闭')}
           </Button>
-          <Button type='primary' onClick={onClose}>
+          <Button type='primary' onClick={handleCloseTodayNotice} loading={markingRead}>
             {t('关闭公告')}
           </Button>
         </div>

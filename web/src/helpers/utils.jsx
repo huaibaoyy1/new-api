@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import { Toast, Pagination } from '@douyinfe/semi-ui';
+import { Toast, Pagination, Select } from '@douyinfe/semi-ui';
 import { toastConstants, BILLING_PRICING_VARS, BILLING_VAR_REGEX } from '../constants';
 import React from 'react';
 import { toast } from 'react-toastify';
@@ -1015,6 +1015,7 @@ export const createCardProPagination = ({
   isMobile = false,
   pageSizeOpts = [10, 20, 50, 100],
   showSizeChanger = true,
+  pageSizePopupPosition = 'top',
   t = (key) => key,
 }) => {
   if (!total || total <= 0) return null;
@@ -1023,32 +1024,81 @@ export const createCardProPagination = ({
   const end = Math.min(currentPage * pageSize, total);
   const totalText = `${t('显示第')} ${start} ${t('条 - 第')} ${end} ${t('条，共')} ${total} ${t('条')}`;
 
-  return (
-    <>
-      {/* 桌面端左侧总数信息 */}
-      {!isMobile && (
+  const pageSizeOptions = pageSizeOpts.map((size) => ({
+    label: `${t('每页条数')}: ${size}`,
+    value: size,
+  }));
+
+  if (isMobile) {
+    return (
+      <div className='flex flex-col items-center gap-2 w-full'>
         <span
           className='text-sm select-none'
           style={{ color: 'var(--semi-color-text-2)' }}
         >
           {totalText}
         </span>
-      )}
+        <Pagination
+          currentPage={currentPage}
+          pageSize={pageSize}
+          total={total}
+          showSizeChanger={false}
+          onPageChange={onPageChange}
+          size='small'
+          showQuickJumper
+          showTotal={false}
+        />
+        {showSizeChanger && (
+          <Select
+            value={pageSize}
+            optionList={pageSizeOptions}
+            onChange={(value) => onPageSizeChange(Number(value))}
+            style={{ width: 140 }}
+            position={pageSizePopupPosition}
+            getPopupContainer={() => document.body}
+          />
+        )}
+      </div>
+    );
+  }
 
-      {/* 右侧分页控件 */}
-      <Pagination
-        currentPage={currentPage}
-        pageSize={pageSize}
-        total={total}
-        pageSizeOpts={pageSizeOpts}
-        showSizeChanger={showSizeChanger}
-        onPageSizeChange={onPageSizeChange}
-        onPageChange={onPageChange}
-        size={isMobile ? 'small' : 'default'}
-        showQuickJumper={isMobile}
-        showTotal
-      />
-    </>
+  return (
+    <div className='flex items-center justify-between w-full gap-3'>
+      <div className='min-w-0 flex-1'>
+        <span
+          className='text-sm select-none whitespace-nowrap flex-shrink-0'
+          style={{ color: 'var(--semi-color-text-2)' }}
+        >
+          {totalText}
+        </span>
+      </div>
+
+      <div className='flex items-center gap-3 flex-shrink-0'>
+        <div className='min-w-0'>
+          <Pagination
+            currentPage={currentPage}
+            pageSize={pageSize}
+            total={total}
+            showSizeChanger={false}
+            onPageChange={onPageChange}
+            size='default'
+            showQuickJumper={false}
+            showTotal={false}
+          />
+        </div>
+
+        {showSizeChanger && (
+          <Select
+            value={pageSize}
+            optionList={pageSizeOptions}
+            onChange={(value) => onPageSizeChange(Number(value))}
+            style={{ width: 140 }}
+            position={pageSizePopupPosition}
+            getPopupContainer={() => document.body}
+          />
+        )}
+      </div>
+    </div>
   );
 };
 

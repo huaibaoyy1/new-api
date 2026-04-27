@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
@@ -27,6 +29,15 @@ import (
 type LoginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+}
+
+type RegisterRequest struct {
+	Username         string `json:"username" validate:"required,max=20"`
+	Password         string `json:"password" validate:"required,min=8,max=20"`
+	Email            string `json:"email" validate:"max=50"`
+	VerificationCode string `json:"verification_code"`
+	AffCode          string `json:"aff_code"`
+	InvitationCode   string `json:"invitation_code"`
 }
 
 func Login(c *gin.Context) {
@@ -91,7 +102,7 @@ func Login(c *gin.Context) {
 
 // setup session & cookies and then return user info
 func setupLogin(user *model.User, c *gin.Context) {
-	model.UpdateUserLastLoginAt(user.Id)
+	model.UpdateUserLastLoginInfo(user.Id, c.ClientIP())
 	session := sessions.Default(c)
 	session.Set("id", user.Id)
 	session.Set("username", user.Username)
@@ -143,27 +154,37 @@ func Register(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgUserPasswordRegisterDisabled)
 		return
 	}
-	var user model.User
-	err := json.NewDecoder(c.Request.Body).Decode(&user)
+	var req RegisterRequest
+	err := json.NewDecoder(c.Request.Body).Decode(&req)
 	if err != nil {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
-	if err := common.Validate.Struct(&user); err != nil {
+	if err := common.Validate.Struct(&req); err != nil {
 		common.ApiErrorI18n(c, i18n.MsgUserInputInvalid, map[string]any{"Error": err.Error()})
 		return
 	}
 	if common.EmailVerificationEnabled {
-		if user.Email == "" || user.VerificationCode == "" {
+		if req.Email == "" || req.VerificationCode == "" {
 			common.ApiErrorI18n(c, i18n.MsgUserEmailVerificationRequired)
 			return
 		}
-		if !common.VerifyCodeWithKey(user.Email, user.VerificationCode, common.EmailVerificationPurpose) {
+		if !common.VerifyCodeWithKey(req.Email, req.VerificationCode, common.EmailVerificationPurpose) {
 			common.ApiErrorI18n(c, i18n.MsgUserVerificationCodeError)
 			return
 		}
 	}
-	exist, err := model.CheckUserExistOrDeleted(user.Username, user.Email)
+	if common.InvitationCodeEnabled {
+		if strings.TrimSpace(req.InvitationCode) == "" {
+			common.ApiError(c, errors.New("邀请码不能为空"))
+			return
+		}
+		if _, err := model.ValidateInvitationCode(strings.TrimSpace(req.InvitationCode)); err != nil {
+			common.ApiError(c, err)
+			return
+		}
+	}
+	exist, err := model.CheckUserExistOrDeleted(req.Username, req.Email)
 	if err != nil {
 		common.ApiErrorI18n(c, i18n.MsgDatabaseError)
 		common.SysLog(fmt.Sprintf("CheckUserExistOrDeleted error: %v", err))
@@ -173,17 +194,17 @@ func Register(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgUserExists)
 		return
 	}
-	affCode := user.AffCode // this code is the inviter's code, not the user's own code
+	affCode := req.AffCode // this code is the inviter's code, not the user's own code
 	inviterId, _ := model.GetUserIdByAffCode(affCode)
 	cleanUser := model.User{
-		Username:    user.Username,
-		Password:    user.Password,
-		DisplayName: user.Username,
+		Username:    req.Username,
+		Password:    req.Password,
+		DisplayName: req.Username,
 		InviterId:   inviterId,
 		Role:        common.RoleCommonUser, // 明确设置角色为普通用户
 	}
 	if common.EmailVerificationEnabled {
-		cleanUser.Email = user.Email
+		cleanUser.Email = req.Email
 	}
 	if err := cleanUser.Insert(inviterId); err != nil {
 		common.ApiError(c, err)
@@ -195,6 +216,13 @@ func Register(c *gin.Context) {
 	if err := model.DB.Where("username = ?", cleanUser.Username).First(&insertedUser).Error; err != nil {
 		common.ApiErrorI18n(c, i18n.MsgUserRegisterFailed)
 		return
+	}
+	if common.InvitationCodeEnabled {
+		if err := model.ConsumeInvitationCode(strings.TrimSpace(req.InvitationCode), insertedUser.Id); err != nil {
+			_ = model.HardDeleteUserById(insertedUser.Id)
+			common.ApiError(c, err)
+			return
+		}
 	}
 	// 生成默认令牌
 	if constant.GenerateDefaultToken {
@@ -234,7 +262,9 @@ func Register(c *gin.Context) {
 
 func GetAllUsers(c *gin.Context) {
 	pageInfo := common.GetPageQuery(c)
-	users, total, err := model.GetAllUsers(pageInfo)
+	days, _ := strconv.Atoi(c.DefaultQuery("days", "1"))
+	filter := modelUserActivityFilterFromRequest(c, days)
+	users, total, err := model.GetAllUsersWithActivity(pageInfo, "", "", filter)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -251,7 +281,9 @@ func SearchUsers(c *gin.Context) {
 	keyword := c.Query("keyword")
 	group := c.Query("group")
 	pageInfo := common.GetPageQuery(c)
-	users, total, err := model.SearchUsers(keyword, group, pageInfo.GetStartIdx(), pageInfo.GetPageSize())
+	days, _ := strconv.Atoi(c.DefaultQuery("days", "1"))
+	filter := modelUserActivityFilterFromRequest(c, days)
+	users, total, err := model.SearchUsersWithActivity(keyword, group, pageInfo.GetStartIdx(), pageInfo.GetPageSize(), filter)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -261,6 +293,125 @@ func SearchUsers(c *gin.Context) {
 	pageInfo.SetItems(users)
 	common.ApiSuccess(c, pageInfo)
 	return
+}
+
+func modelUserActivityFilterFromRequest(c *gin.Context, days int) model.UserActivityFilter {
+	return model.UserActivityFilter{
+		Days:          days,
+		ConsumeStatus: c.DefaultQuery("consume_status", "all"),
+		CheckinStatus: c.DefaultQuery("checkin_status", "all"),
+	}
+}
+
+func GetUserActivitySummary(c *gin.Context) {
+	keyword := c.Query("keyword")
+	group := c.Query("group")
+	days, _ := strconv.Atoi(c.DefaultQuery("days", "1"))
+	filter := modelUserActivityFilterFromRequest(c, days)
+	summary, err := model.GetUserActivitySummary(keyword, group, filter)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, summary)
+}
+
+func ExportUserActivityCSV(c *gin.Context) {
+	keyword := c.Query("keyword")
+	group := c.Query("group")
+	days, _ := strconv.Atoi(c.DefaultQuery("days", "1"))
+	filter := modelUserActivityFilterFromRequest(c, days)
+
+	users, err := model.GetAllUsersActivity(keyword, group, filter)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	filename := fmt.Sprintf("users_activity_%dd.csv", filter.Days)
+	c.Header("Content-Type", "text/csv; charset=utf-8")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+
+	writer := csv.NewWriter(c.Writer)
+	defer writer.Flush()
+
+	header := []string{
+		"用户ID",
+		"用户名",
+		"显示名称",
+		"邮箱",
+		"分组",
+		"角色",
+		"状态",
+		"当前时间范围总Token",
+		"当前时间范围消费额度",
+		"当前时间范围消费次数",
+		"当前时间范围签到次数",
+		"当前时间范围是否签到",
+		"创建时间",
+		"最后登录时间",
+	}
+	if err := writer.Write(header); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	roleText := func(role int) string {
+		switch role {
+		case common.RoleRootUser:
+			return "超级管理员"
+		case common.RoleAdminUser:
+			return "管理员"
+		default:
+			return "普通用户"
+		}
+	}
+	statusText := func(status int) string {
+		switch status {
+		case common.UserStatusEnabled:
+			return "已启用"
+		case common.UserStatusDisabled:
+			return "已禁用"
+		default:
+			return "未知"
+		}
+	}
+	boolText := func(v bool) string {
+		if v {
+			return "是"
+		}
+		return "否"
+	}
+	formatTS := func(ts int64) string {
+		if ts <= 0 {
+			return ""
+		}
+		return time.Unix(ts, 0).Format("2006-01-02 15:04:05")
+	}
+
+	for _, user := range users {
+		record := []string{
+			strconv.Itoa(user.Id),
+			user.Username,
+			user.DisplayName,
+			user.Email,
+			user.Group,
+			roleText(user.Role),
+			statusText(user.Status),
+			strconv.FormatInt(user.TotalTokens, 10),
+			strconv.FormatInt(user.TotalConsumeQuota, 10),
+			strconv.FormatInt(user.ConsumeCount, 10),
+			strconv.FormatInt(user.CheckinCount, 10),
+			boolText(user.CheckedIn),
+			formatTS(user.CreatedAt),
+			formatTS(user.LastLoginAt),
+			user.LastLoginIP,
+		}
+		if err := writer.Write(record); err != nil {
+			common.ApiError(c, err)
+			return
+		}
+	}
 }
 
 func GetUser(c *gin.Context) {
@@ -848,6 +999,11 @@ type ManageRequest struct {
 	Mode   string `json:"mode"`
 }
 
+type BatchManageRequest struct {
+	Ids    []int  `json:"ids"`
+	Action string `json:"action"`
+}
+
 // ManageUser Only admin user can do this
 func ManageUser(c *gin.Context) {
 	var req ManageRequest
@@ -992,6 +1148,79 @@ func ManageUser(c *gin.Context) {
 		"data":    clearUser,
 	})
 	return
+}
+
+func ManageUserBatch(c *gin.Context) {
+	var req BatchManageRequest
+	err := json.NewDecoder(c.Request.Body).Decode(&req)
+	if err != nil || len(req.Ids) == 0 {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+
+	myRole := c.GetInt("role")
+	adminName := c.GetString("username")
+	adminId := c.GetInt("id")
+
+	updatedIds := make([]int, 0, len(req.Ids))
+	for _, userId := range req.Ids {
+		user := model.User{Id: userId}
+		model.DB.Unscoped().Where(&user).First(&user)
+		if user.Id == 0 {
+			continue
+		}
+		if myRole <= user.Role && myRole != common.RoleRootUser {
+			continue
+		}
+
+		needInvalidate := false
+		switch req.Action {
+		case "disable":
+			if user.Role == common.RoleRootUser {
+				continue
+			}
+			user.Status = common.UserStatusDisabled
+			needInvalidate = true
+		case "enable":
+			user.Status = common.UserStatusEnabled
+		default:
+			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+			return
+		}
+
+		if err := user.Update(false); err != nil {
+			common.ApiError(c, err)
+			return
+		}
+
+		if needInvalidate {
+			if err := model.InvalidateUserCache(user.Id); err != nil {
+				common.SysLog(fmt.Sprintf("failed to invalidate user cache for user %d: %s", user.Id, err.Error()))
+			}
+			if err := model.InvalidateUserTokensCache(user.Id); err != nil {
+				common.SysLog(fmt.Sprintf("failed to invalidate tokens cache for user %d: %s", user.Id, err.Error()))
+			}
+		}
+
+		model.RecordLogWithAdminInfo(user.Id, model.LogTypeManage,
+			fmt.Sprintf("管理员批量%s用户", map[string]string{
+				"disable": "禁用",
+				"enable":  "启用",
+			}[req.Action]),
+			map[string]interface{}{
+				"admin_id":       adminId,
+				"admin_username": adminName,
+				"batch_action":   req.Action,
+			},
+		)
+
+		updatedIds = append(updatedIds, user.Id)
+	}
+
+	common.ApiSuccess(c, gin.H{
+		"updated_ids": updatedIds,
+		"count":       len(updatedIds),
+	})
 }
 
 type emailBindRequest struct {

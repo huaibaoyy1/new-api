@@ -35,6 +35,19 @@ export const useUsersData = () => {
   const [searching, setSearching] = useState(false);
   const [groupOptions, setGroupOptions] = useState([]);
   const [userCount, setUserCount] = useState(0);
+  const [selectedUserIds, setSelectedUserIds] = useState([]);
+  const [activityFilters, setActivityFilters] = useState({
+    days: 1,
+    consumeStatus: 'all',
+    checkinStatus: 'all',
+  });
+  const [activitySummary, setActivitySummary] = useState({
+    total_users: 0,
+    consumed_users: 0,
+    not_consumed_users: 0,
+    checked_users: 0,
+    not_checked_users: 0,
+  });
 
   // Modal states
   const [showAddUser, setShowAddUser] = useState(false);
@@ -47,6 +60,9 @@ export const useUsersData = () => {
   const formInitValues = {
     searchKeyword: '',
     searchGroup: '',
+    activityDays: 1,
+    consumeStatus: 'all',
+    checkinStatus: 'all',
   };
 
   // Form API reference
@@ -58,7 +74,38 @@ export const useUsersData = () => {
     return {
       searchKeyword: formValues.searchKeyword || '',
       searchGroup: formValues.searchGroup || '',
+      activityDays: Number(formValues.activityDays || 1),
+      consumeStatus: formValues.consumeStatus || 'all',
+      checkinStatus: formValues.checkinStatus || 'all',
     };
+  };
+
+  const loadActivitySummary = async (
+    searchKeyword = '',
+    searchGroup = '',
+    filters = activityFilters,
+  ) => {
+    try {
+      const res = await API.get(
+        `/api/user/activity_summary?keyword=${searchKeyword}&group=${searchGroup}&days=${filters.days}&consume_status=${filters.consumeStatus}&checkin_status=${filters.checkinStatus}`,
+      );
+      const { success, message, data } = res.data;
+      if (success) {
+        setActivitySummary(
+          data || {
+            total_users: 0,
+            consumed_users: 0,
+            not_consumed_users: 0,
+            checked_users: 0,
+            not_checked_users: 0,
+          },
+        );
+      } else {
+        showError(message);
+      }
+    } catch (error) {
+      showError(error.message);
+    }
   };
 
   // Set user format with key field
@@ -70,15 +117,20 @@ export const useUsersData = () => {
   };
 
   // Load users data
-  const loadUsers = async (startIdx, pageSize) => {
+  const loadUsers = async (startIdx, pageSize, nextFilters = null) => {
     setLoading(true);
-    const res = await API.get(`/api/user/?p=${startIdx}&page_size=${pageSize}`);
+    const filters = nextFilters || activityFilters;
+    setActivityFilters(filters);
+    const res = await API.get(
+      `/api/user/?p=${startIdx}&page_size=${pageSize}&days=${filters.days}&consume_status=${filters.consumeStatus}&checkin_status=${filters.checkinStatus}`,
+    );
     const { success, message, data } = res.data;
     if (success) {
       const newPageData = data.items;
       setActivePage(data.page);
       setUserCount(data.total);
       setUserFormat(newPageData);
+      await loadActivitySummary('', '', filters);
     } else {
       showError(message);
     }
@@ -91,22 +143,30 @@ export const useUsersData = () => {
     pageSize,
     searchKeyword = null,
     searchGroup = null,
+    nextFilters = null,
   ) => {
+    let filters = nextFilters;
     // If no parameters passed, get values from form
-    if (searchKeyword === null || searchGroup === null) {
+    if (searchKeyword === null || searchGroup === null || nextFilters === null) {
       const formValues = getFormValues();
-      searchKeyword = formValues.searchKeyword;
-      searchGroup = formValues.searchGroup;
+      searchKeyword = searchKeyword === null ? formValues.searchKeyword : searchKeyword;
+      searchGroup = searchGroup === null ? formValues.searchGroup : searchGroup;
+      filters = nextFilters || {
+        days: formValues.activityDays,
+        consumeStatus: formValues.consumeStatus,
+        checkinStatus: formValues.checkinStatus,
+      };
     }
 
+    setActivityFilters(filters);
+
     if (searchKeyword === '' && searchGroup === '') {
-      // If keyword is blank, load files instead
-      await loadUsers(startIdx, pageSize);
+      await loadUsers(startIdx, pageSize, filters);
       return;
     }
     setSearching(true);
     const res = await API.get(
-      `/api/user/search?keyword=${searchKeyword}&group=${searchGroup}&p=${startIdx}&page_size=${pageSize}`,
+      `/api/user/search?keyword=${searchKeyword}&group=${searchGroup}&p=${startIdx}&page_size=${pageSize}&days=${filters.days}&consume_status=${filters.consumeStatus}&checkin_status=${filters.checkinStatus}`,
     );
     const { success, message, data } = res.data;
     if (success) {
@@ -114,6 +174,7 @@ export const useUsersData = () => {
       setActivePage(data.page);
       setUserCount(data.total);
       setUserFormat(newPageData);
+      await loadActivitySummary(searchKeyword, searchGroup, filters);
     } else {
       showError(message);
     }
@@ -191,11 +252,22 @@ export const useUsersData = () => {
   // Handle page change
   const handlePageChange = (page) => {
     setActivePage(page);
-    const { searchKeyword, searchGroup } = getFormValues();
+    const {
+      searchKeyword,
+      searchGroup,
+      activityDays,
+      consumeStatus,
+      checkinStatus,
+    } = getFormValues();
+    const filters = {
+      days: activityDays,
+      consumeStatus,
+      checkinStatus,
+    };
     if (searchKeyword === '' && searchGroup === '') {
-      loadUsers(page, pageSize).then();
+      loadUsers(page, pageSize, filters).then();
     } else {
-      searchUsers(page, pageSize, searchKeyword, searchGroup).then();
+      searchUsers(page, pageSize, searchKeyword, searchGroup, filters).then();
     }
   };
 
@@ -204,7 +276,7 @@ export const useUsersData = () => {
     localStorage.setItem('page-size', size + '');
     setPageSize(size);
     setActivePage(1);
-    loadUsers(activePage, size)
+    loadUsers(activePage, size, activityFilters)
       .then()
       .catch((reason) => {
         showError(reason);
@@ -224,13 +296,89 @@ export const useUsersData = () => {
     }
   };
 
+  const batchManageUsers = async (action) => {
+    if (!selectedUserIds.length) {
+      showError(t('请先选择用户'));
+      return false;
+    }
+    try {
+      const res = await API.post('/api/user/manage_batch', {
+        ids: selectedUserIds,
+        action,
+      });
+      const { success, message, data } = res.data;
+      if (success) {
+        showSuccess(
+          t('批量操作成功，已处理 {{count}} 个用户', {
+            count: data?.count || 0,
+          }),
+        );
+        setSelectedUserIds([]);
+        await refresh();
+        return true;
+      } else {
+        showError(message);
+      }
+    } catch (error) {
+      showError(error.message);
+    }
+    return false;
+  };
+
+  const exportActivityCSV = async () => {
+    const {
+      searchKeyword,
+      searchGroup,
+      activityDays,
+      consumeStatus,
+      checkinStatus,
+    } = getFormValues();
+    try {
+      const res = await API.get('/api/user/activity_export', {
+        params: {
+          keyword: searchKeyword || '',
+          group: searchGroup || '',
+          days: String(activityDays || 1),
+          consume_status: consumeStatus || 'all',
+          checkin_status: checkinStatus || 'all',
+        },
+        responseType: 'blob',
+      });
+
+      const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const contentDisposition = res.headers['content-disposition'] || '';
+      const match = contentDisposition.match(/filename="?([^"]+)"?/);
+      link.href = url;
+      link.download = match?.[1] || `users_activity_${activityDays || 1}d.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      showError(error.message);
+    }
+  };
+
   // Refresh data
   const refresh = async (page = activePage) => {
-    const { searchKeyword, searchGroup } = getFormValues();
+    const {
+      searchKeyword,
+      searchGroup,
+      activityDays,
+      consumeStatus,
+      checkinStatus,
+    } = getFormValues();
+    const filters = {
+      days: activityDays,
+      consumeStatus,
+      checkinStatus,
+    };
     if (searchKeyword === '' && searchGroup === '') {
-      await loadUsers(page, pageSize);
+      await loadUsers(page, pageSize, filters);
     } else {
-      await searchUsers(page, pageSize, searchKeyword, searchGroup);
+      await searchUsers(page, pageSize, searchKeyword, searchGroup, filters);
     }
   };
 
@@ -266,7 +414,7 @@ export const useUsersData = () => {
 
   // Initialize data on component mount
   useEffect(() => {
-    loadUsers(0, pageSize)
+    loadUsers(0, pageSize, activityFilters)
       .then()
       .catch((reason) => {
         showError(reason);
@@ -281,8 +429,13 @@ export const useUsersData = () => {
     activePage,
     pageSize,
     userCount,
+    selectedUserIds,
     searching,
     groupOptions,
+    activityFilters,
+    activitySummary,
+    setActivityFilters,
+    setSelectedUserIds,
 
     // Modal state
     showAddUser,
@@ -314,6 +467,9 @@ export const useUsersData = () => {
     closeAddUser,
     closeEditUser,
     getFormValues,
+    loadActivitySummary,
+    exportActivityCSV,
+    batchManageUsers,
 
     // Translation
     t,

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -39,6 +40,55 @@ func TestStatus(c *gin.Context) {
 	return
 }
 
+type statusAnnouncement struct {
+	Id          int    `json:"id"`
+	Content     string `json:"content"`
+	PublishDate string `json:"publishDate"`
+	Type        string `json:"type,omitempty"`
+	Extra       string `json:"extra,omitempty"`
+}
+
+func buildAnnouncementsForUser(c *gin.Context) []statusAnnouncement {
+	raw := console_setting.GetAnnouncements()
+	if len(raw) == 0 {
+		return []statusAnnouncement{}
+	}
+
+	items := make([]statusAnnouncement, 0, len(raw))
+	announcementIds := make([]int, 0, len(raw))
+	for index, item := range raw {
+		id := 0
+		switch v := item["id"].(type) {
+		case float64:
+			id = int(v)
+		case int:
+			id = v
+		}
+		if id <= 0 {
+			id = index + 1
+		}
+		content, _ := item["content"].(string)
+		publishDate, _ := item["publishDate"].(string)
+		announcementType, _ := item["type"].(string)
+		extra, _ := item["extra"].(string)
+
+		items = append(items, statusAnnouncement{
+			Id:          id,
+			Content:     content,
+			PublishDate: publishDate,
+			Type:        announcementType,
+			Extra:       extra,
+		})
+		announcementIds = append(announcementIds, id)
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].PublishDate > items[j].PublishDate
+	})
+
+	return items
+}
+
 func GetStatus(c *gin.Context) {
 
 	cs := console_setting.GetConsoleSetting()
@@ -69,6 +119,7 @@ func GetStatus(c *gin.Context) {
 		"server_address":              system_setting.ServerAddress,
 		"turnstile_check":             common.TurnstileCheckEnabled,
 		"turnstile_site_key":          common.TurnstileSiteKey,
+		"invitation_code_enabled":     common.InvitationCodeEnabled,
 		"top_up_link":                 common.TopUpLink,
 		"docs_link":                   operation_setting.GetGeneralSetting().DocsLink,
 		"quota_per_unit":              common.QuotaPerUnit,
@@ -124,7 +175,7 @@ func GetStatus(c *gin.Context) {
 		data["api_info"] = console_setting.GetApiInfo()
 	}
 	if cs.AnnouncementsEnabled {
-		data["announcements"] = console_setting.GetAnnouncements()
+		data["announcements"] = buildAnnouncementsForUser(c)
 	}
 	if cs.FAQEnabled {
 		data["faq"] = console_setting.GetFAQ()

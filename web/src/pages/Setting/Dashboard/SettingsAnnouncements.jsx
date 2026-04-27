@@ -31,6 +31,8 @@ import {
   Switch,
   TextArea,
   Tooltip,
+  Select,
+  Input,
 } from '@douyinfe/semi-ui';
 import {
   IllustrationNoResult,
@@ -55,8 +57,10 @@ const SettingsAnnouncements = ({ options, refresh }) => {
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showContentModal, setShowContentModal] = useState(false);
+  const [showReadStatusModal, setShowReadStatusModal] = useState(false);
   const [deletingAnnouncement, setDeletingAnnouncement] = useState(null);
   const [editingAnnouncement, setEditingAnnouncement] = useState(null);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
   const [modalLoading, setModalLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -69,6 +73,18 @@ const SettingsAnnouncements = ({ options, refresh }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [readStatusLoading, setReadStatusLoading] = useState(false);
+  const [readStatusKeyword, setReadStatusKeyword] = useState('');
+  const [readStatusFilter, setReadStatusFilter] = useState('all');
+  const [readStatusData, setReadStatusData] = useState([]);
+  const [readStatusPage, setReadStatusPage] = useState(1);
+  const [readStatusPageSize, setReadStatusPageSize] = useState(10);
+  const [readStatusTotal, setReadStatusTotal] = useState(0);
+  const [readStatusStats, setReadStatusStats] = useState({
+    total_users: 0,
+    read_count: 0,
+    unread_count: 0,
+  });
 
   // 面板启用状态
   const [panelEnabled, setPanelEnabled] = useState(true);
@@ -93,6 +109,110 @@ const SettingsAnnouncements = ({ options, refresh }) => {
     };
     return colorMap[type] || 'grey';
   };
+
+  const loadReadStatus = async (
+    announcement,
+    page = readStatusPage,
+    size = readStatusPageSize,
+    keyword = readStatusKeyword,
+    status = readStatusFilter,
+  ) => {
+    if (!announcement?.id) {
+      return;
+    }
+    try {
+      setReadStatusLoading(true);
+      const res = await API.get(`/api/announcements/${announcement.id}/read-status`, {
+        params: {
+          keyword,
+          status,
+          p: page,
+          page_size: size,
+        },
+      });
+      const { success, message, data } = res.data;
+      if (success) {
+        setReadStatusData(data.items || []);
+        setReadStatusTotal(data.total || 0);
+        setReadStatusPage(data.page || page);
+        setReadStatusPageSize(data.page_size || size);
+        setReadStatusFilter(data.status || status);
+        setReadStatusStats(
+          data.statistics || {
+            total_users: 0,
+            read_count: 0,
+            unread_count: 0,
+          },
+        );
+      } else {
+        showError(message);
+      }
+    } catch (error) {
+      showError(error.message);
+    } finally {
+      setReadStatusLoading(false);
+    }
+  };
+
+  const handleOpenReadStatus = async (announcement) => {
+    setSelectedAnnouncement(announcement);
+    setReadStatusKeyword('');
+    setReadStatusFilter('all');
+    setReadStatusData([]);
+    setReadStatusPage(1);
+    setReadStatusPageSize(10);
+    setReadStatusTotal(0);
+    setReadStatusStats({
+      total_users: 0,
+      read_count: 0,
+      unread_count: 0,
+    });
+    setShowReadStatusModal(true);
+    await loadReadStatus(announcement, 1, 10, '', 'all');
+  };
+
+  const readStatusColumns = [
+    {
+      title: t('用户名'),
+      dataIndex: 'username',
+      key: 'username',
+    },
+    {
+      title: t('邮箱'),
+      dataIndex: 'email',
+      key: 'email',
+      render: (text) => text || '-',
+    },
+    {
+      title: t('创建时间'),
+      dataIndex: 'created_at',
+      key: 'created_at',
+      render: (text) => (text ? formatDateTimeString(new Date(text * 1000)) : '-'),
+    },
+    {
+      title: t('最后登录'),
+      dataIndex: 'last_login_at',
+      key: 'last_login_at',
+      render: (text) => (text ? formatDateTimeString(new Date(text * 1000)) : '-'),
+    },
+    {
+      title: t('状态'),
+      dataIndex: 'is_read',
+      key: 'is_read',
+      render: (value) => (
+        <Tag color={value ? 'green' : 'grey'} shape='circle'>
+          {value ? t('已读') : t('未读')}
+        </Tag>
+      ),
+    },
+    {
+      title: t('已读时间'),
+      dataIndex: 'read_at',
+      key: 'read_at',
+      render: (text, record) =>
+        record.is_read && text ? formatDateTimeString(new Date(text * 1000)) : '-',
+    },
+  ];
 
   const columns = [
     {
@@ -171,9 +291,17 @@ const SettingsAnnouncements = ({ options, refresh }) => {
       title: t('操作'),
       key: 'action',
       fixed: 'right',
-      width: 150,
+      width: 240,
       render: (text, record) => (
-        <Space>
+        <Space wrap>
+          <Button
+            size='small'
+            theme='light'
+            type='secondary'
+            onClick={() => handleOpenReadStatus(record)}
+          >
+            {t('已读情况')}
+          </Button>
           <Button
             icon={<Edit size={14} />}
             theme='light'
@@ -393,7 +521,7 @@ const SettingsAnnouncements = ({ options, refresh }) => {
           <Bell size={16} className='mr-2' />
           <Text>
             {t(
-              '系统公告管理，可以发布系统通知和重要消息（最多100个，前端显示最新20条）',
+              '系统公告管理，可以发布系统通知和重要消息（最多100个，前端显示最新20条，单条内容最多1500字符）',
             )}
           </Text>
         </div>
@@ -535,8 +663,8 @@ const SettingsAnnouncements = ({ options, refresh }) => {
           <Form.TextArea
             field='content'
             label={t('公告内容')}
-            placeholder={t('请输入公告内容（支持 Markdown/HTML）')}
-            maxCount={500}
+            placeholder={t('请输入公告内容（支持 Markdown/HTML，最多1500字符）')}
+            maxCount={1500}
             rows={3}
             rules={[{ required: true, message: t('请输入公告内容') }]}
             onChange={(value) =>
@@ -600,6 +728,116 @@ const SettingsAnnouncements = ({ options, refresh }) => {
         <Text>{t('确定要删除此公告吗？')}</Text>
       </Modal>
 
+      <Modal
+        title={
+          selectedAnnouncement
+            ? `${t('公告已读情况')} - ${selectedAnnouncement.id}`
+            : t('公告已读情况')
+        }
+        visible={showReadStatusModal}
+        footer={null}
+        onCancel={() => {
+          setShowReadStatusModal(false);
+          setSelectedAnnouncement(null);
+        }}
+        width={1000}
+      >
+        <div className='flex flex-col gap-3'>
+          <div className='flex flex-col gap-2'>
+            <div className='flex flex-wrap gap-2'>
+              <Tag color='blue' shape='circle'>
+                {t('总人数')}：{readStatusStats.total_users || 0}
+              </Tag>
+              <Tag color='green' shape='circle'>
+                {t('已读')}：{readStatusStats.read_count || 0}
+              </Tag>
+              <Tag color='grey' shape='circle'>
+                {t('未读')}：{readStatusStats.unread_count || 0}
+              </Tag>
+            </div>
+            <div className='flex gap-2'>
+              <Select
+                value={readStatusFilter}
+                optionList={[
+                  { value: 'all', label: t('全部') },
+                  { value: 'read', label: t('已读') },
+                  { value: 'unread', label: t('未读') },
+                ]}
+                style={{ width: 140 }}
+                onChange={(value) => {
+                  setReadStatusFilter(value);
+                  setReadStatusPage(1);
+                  loadReadStatus(
+                    selectedAnnouncement,
+                    1,
+                    readStatusPageSize,
+                    readStatusKeyword,
+                    value,
+                  );
+                }}
+              />
+              <Input
+                placeholder={t('搜索用户名或邮箱')}
+                value={readStatusKeyword}
+                onChange={(value) => setReadStatusKeyword(value)}
+                style={{ flex: 1 }}
+              />
+              <Button
+                type='primary'
+                theme='solid'
+                onClick={() => {
+                  setReadStatusPage(1);
+                  loadReadStatus(
+                    selectedAnnouncement,
+                    1,
+                    readStatusPageSize,
+                    readStatusKeyword,
+                    readStatusFilter,
+                  );
+                }}
+              >
+                {t('搜索')}
+              </Button>
+            </div>
+          </div>
+          <Table
+            columns={readStatusColumns}
+            dataSource={readStatusData}
+            rowKey='user_id'
+            loading={readStatusLoading}
+            pagination={{
+              currentPage: readStatusPage,
+              pageSize: readStatusPageSize,
+              total: readStatusTotal,
+              showSizeChanger: true,
+              pageSizeOptions: ['10', '20', '50'],
+              onChange: (page, size) => {
+                setReadStatusPage(page);
+                setReadStatusPageSize(size);
+                loadReadStatus(
+                  selectedAnnouncement,
+                  page,
+                  size,
+                  readStatusKeyword,
+                  readStatusFilter,
+                );
+              },
+              onShowSizeChange: (current, size) => {
+                setReadStatusPage(1);
+                setReadStatusPageSize(size);
+                loadReadStatus(
+                  selectedAnnouncement,
+                  1,
+                  size,
+                  readStatusKeyword,
+                  readStatusFilter,
+                );
+              },
+            }}
+          />
+        </div>
+      </Modal>
+
       {/* 公告内容放大编辑 Modal */}
       <Modal
         title={t('编辑公告内容')}
@@ -618,8 +856,8 @@ const SettingsAnnouncements = ({ options, refresh }) => {
       >
         <TextArea
           value={announcementForm.content}
-          placeholder={t('请输入公告内容（支持 Markdown/HTML）')}
-          maxCount={500}
+          placeholder={t('请输入公告内容（支持 Markdown/HTML，最多1500字符）')}
+          maxCount={1500}
           rows={15}
           style={{ width: '100%' }}
           onChange={(value) =>

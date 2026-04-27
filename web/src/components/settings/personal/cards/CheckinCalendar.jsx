@@ -120,10 +120,27 @@ const CheckinCalendar = ({ t, status, turnstileEnabled, turnstileSiteKey }) => {
     return API.post(url);
   };
 
+  const openTurnstileCheckinModal = () => {
+    if (!turnstileSiteKey) {
+      showError('Turnstile is enabled but site key is empty.');
+      return;
+    }
+    setTurnstileWidgetKey((v) => v + 1);
+    setTurnstileModalVisible(true);
+  };
+
   const shouldTriggerTurnstile = (message) => {
     if (!turnstileEnabled) return false;
     if (typeof message !== 'string') return true;
     return message.includes('Turnstile');
+  };
+
+  const handleCheckinClick = () => {
+    if (turnstileEnabled) {
+      openTurnstileCheckinModal();
+      return;
+    }
+    doCheckin();
   };
 
   const doCheckin = async (token) => {
@@ -140,11 +157,7 @@ const CheckinCalendar = ({ t, status, turnstileEnabled, turnstileSiteKey }) => {
         setTurnstileModalVisible(false);
       } else {
         if (!token && shouldTriggerTurnstile(message)) {
-          if (!turnstileSiteKey) {
-            showError('Turnstile is enabled but site key is empty.');
-            return;
-          }
-          setTurnstileModalVisible(true);
+          openTurnstileCheckinModal();
           return;
         }
         if (token && shouldTriggerTurnstile(message)) {
@@ -273,7 +286,7 @@ const CheckinCalendar = ({ t, status, turnstileEnabled, turnstileSiteKey }) => {
           type='primary'
           theme='solid'
           icon={<Gift size={16} />}
-          onClick={() => doCheckin()}
+          onClick={handleCheckinClick}
           loading={checkinLoading || !initialLoaded}
           disabled={!initialLoaded || checkinData.stats?.checked_in_today}
           className='!bg-green-600 hover:!bg-green-700'

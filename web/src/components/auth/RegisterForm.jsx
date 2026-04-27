@@ -87,6 +87,14 @@ const RegisterForm = () => {
   const [turnstileEnabled, setTurnstileEnabled] = useState(false);
   const [turnstileSiteKey, setTurnstileSiteKey] = useState('');
   const [turnstileToken, setTurnstileToken] = useState('');
+  const [invitationCodeEnabled, setInvitationCodeEnabled] = useState(false);
+  const [invitationCodeValidating, setInvitationCodeValidating] =
+    useState(false);
+  const [invitationCodeValidation, setInvitationCodeValidation] = useState({
+    valid: false,
+    invalid: false,
+    message: '',
+  });
   const [showWeChatLoginModal, setShowWeChatLoginModal] = useState(false);
   const [showEmailRegister, setShowEmailRegister] = useState(false);
   const [wechatLoading, setWechatLoading] = useState(false);
@@ -145,6 +153,7 @@ const RegisterForm = () => {
 
   useEffect(() => {
     setShowEmailVerification(!!status?.email_verification);
+    setInvitationCodeEnabled(!!status?.invitation_code_enabled);
     if (status?.turnstile_check) {
       setTurnstileEnabled(true);
       setTurnstileSiteKey(status.turnstile_site_key);
@@ -211,8 +220,62 @@ const RegisterForm = () => {
     }
   };
 
+  async function validateInvitationCode(code) {
+    if (!code) {
+      setInvitationCodeValidation({
+        valid: false,
+        invalid: false,
+        message: '',
+      });
+      return true;
+    }
+    setInvitationCodeValidating(true);
+    try {
+      const res = await API.post('/api/invitation/validate', { code });
+      const { success, data, message } = res.data;
+      if (!success) {
+        setInvitationCodeValidation({
+          valid: false,
+          invalid: true,
+          message: message || t('邀请码无效'),
+        });
+        return false;
+      }
+      if (data?.valid) {
+        setInvitationCodeValidation({
+          valid: true,
+          invalid: false,
+          message: '',
+        });
+        return true;
+      }
+      setInvitationCodeValidation({
+        valid: false,
+        invalid: true,
+        message: data?.error || t('邀请码无效'),
+      });
+      return false;
+    } catch (error) {
+      setInvitationCodeValidation({
+        valid: false,
+        invalid: true,
+        message: t('邀请码校验失败'),
+      });
+      return false;
+    } finally {
+      setInvitationCodeValidating(false);
+    }
+  }
+
   function handleChange(name, value) {
     setInputs((inputs) => ({ ...inputs, [name]: value }));
+    if (name === 'invitation_code') {
+      setInvitationCodeValidation({
+        valid: false,
+        invalid: false,
+        message: '',
+      });
+    }
   }
 
   async function handleSubmit(e) {
@@ -225,6 +288,18 @@ const RegisterForm = () => {
       return;
     }
     if (username && password) {
+      if (invitationCodeEnabled) {
+        const invitationCode = (inputs.invitation_code || '').trim();
+        if (!invitationCode) {
+          showInfo('请输入邀请码');
+          return;
+        }
+        const isValid = await validateInvitationCode(invitationCode);
+        if (!isValid) {
+          showError(invitationCodeValidation.message || '邀请码无效');
+          return;
+        }
+      }
       if (turnstileEnabled && turnstileToken === '') {
         showInfo('请稍后几秒重试，Turnstile 正在检查用户环境！');
         return;
@@ -601,6 +676,29 @@ const RegisterForm = () => {
                   onChange={(value) => handleChange('password2', value)}
                   prefix={<IconLock />}
                 />
+
+                {invitationCodeEnabled && (
+                  <Form.Input
+                    field='invitation_code'
+                    label={t('邀请码')}
+                    placeholder={t('请输入邀请码')}
+                    name='invitation_code'
+                    onChange={(value) => handleChange('invitation_code', value)}
+                    suffix={
+                      invitationCodeValidating
+                        ? t('校验中...')
+                        : invitationCodeValidation.valid
+                          ? t('有效')
+                          : ''
+                    }
+                  />
+                )}
+
+                {invitationCodeEnabled && invitationCodeValidation.invalid && (
+                  <div className='text-xs text-red-500'>
+                    {invitationCodeValidation.message}
+                  </div>
+                )}
 
                 {showEmailVerification && (
                   <>

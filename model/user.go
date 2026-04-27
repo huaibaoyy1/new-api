@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -52,6 +51,12 @@ type User struct {
 	StripeCustomer   string         `json:"stripe_customer" gorm:"type:varchar(64);column:stripe_customer;index"`
 	CreatedAt        int64          `json:"created_at" gorm:"autoCreateTime;column:created_at"`
 	LastLoginAt      int64          `json:"last_login_at" gorm:"default:0;column:last_login_at"`
+	LastLoginIP      string         `json:"last_login_ip" gorm:"type:varchar(64);default:'';column:last_login_ip"`
+	TotalTokens      int64          `json:"total_tokens" gorm:"-"`
+	TotalConsumeQuota int64         `json:"total_consume_quota" gorm:"-"`
+	ConsumeCount     int64          `json:"consume_count" gorm:"-"`
+	CheckinCount     int64          `json:"checkin_count" gorm:"-"`
+	CheckedIn        bool           `json:"checked_in" gorm:"-"`
 }
 
 func (user *User) ToBaseUser() *UserBase {
@@ -191,7 +196,11 @@ func GetMaxUserId() int {
 }
 
 func GetAllUsers(pageInfo *common.PageInfo) (users []*User, total int64, err error) {
-	// Start transaction
+	filter := UserActivityFilter{}
+	return GetAllUsersWithActivity(pageInfo, "", "", filter)
+}
+
+func GetAllUsersWithActivity(pageInfo *common.PageInfo, keyword string, group string, filter UserActivityFilter) (users []*User, total int64, err error) {
 	tx := DB.Begin()
 	if tx.Error != nil {
 		return nil, 0, tx.Error
@@ -202,21 +211,22 @@ func GetAllUsers(pageInfo *common.PageInfo) (users []*User, total int64, err err
 		}
 	}()
 
-	// Get total count within transaction
-	err = tx.Unscoped().Model(&User{}).Count(&total).Error
+	query := buildUserActivityQuery(tx, keyword, group, filter)
+
+	err = query.Count(&total).Error
 	if err != nil {
 		tx.Rollback()
 		return nil, 0, err
 	}
 
-	// Get paginated users within same transaction
-	err = tx.Unscoped().Order("id desc").Limit(pageInfo.GetPageSize()).Offset(pageInfo.GetStartIdx()).Omit("password").Find(&users).Error
+	err = query.Order("users.id desc").Limit(pageInfo.GetPageSize()).Offset(pageInfo.GetStartIdx()).Omit("password").Find(&users).Error
 	if err != nil {
 		tx.Rollback()
 		return nil, 0, err
 	}
 
-	// Commit transaction
+	fillUserActivityFields(users)
+
 	if err = tx.Commit().Error; err != nil {
 		return nil, 0, err
 	}
@@ -225,70 +235,16 @@ func GetAllUsers(pageInfo *common.PageInfo) (users []*User, total int64, err err
 }
 
 func SearchUsers(keyword string, group string, startIdx int, num int) ([]*User, int64, error) {
-	var users []*User
-	var total int64
-	var err error
+	filter := UserActivityFilter{}
+	return SearchUsersWithActivity(keyword, group, startIdx, num, filter)
+}
 
-	// 开始事务
-	tx := DB.Begin()
-	if tx.Error != nil {
-		return nil, 0, tx.Error
+func SearchUsersWithActivity(keyword string, group string, startIdx int, num int, filter UserActivityFilter) ([]*User, int64, error) {
+	pageInfo := &common.PageInfo{
+		Page:     startIdx/num + 1,
+		PageSize: num,
 	}
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
-
-	// 构建基础查询
-	query := tx.Unscoped().Model(&User{})
-
-	// 构建搜索条件
-	likeCondition := "username LIKE ? OR email LIKE ? OR display_name LIKE ?"
-
-	// 尝试将关键字转换为整数ID
-	keywordInt, err := strconv.Atoi(keyword)
-	if err == nil {
-		// 如果是数字，同时搜索ID和其他字段
-		likeCondition = "id = ? OR " + likeCondition
-		if group != "" {
-			query = query.Where("("+likeCondition+") AND "+commonGroupCol+" = ?",
-				keywordInt, "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%", group)
-		} else {
-			query = query.Where(likeCondition,
-				keywordInt, "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%")
-		}
-	} else {
-		// 非数字关键字，只搜索字符串字段
-		if group != "" {
-			query = query.Where("("+likeCondition+") AND "+commonGroupCol+" = ?",
-				"%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%", group)
-		} else {
-			query = query.Where(likeCondition,
-				"%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%")
-		}
-	}
-
-	// 获取总数
-	err = query.Count(&total).Error
-	if err != nil {
-		tx.Rollback()
-		return nil, 0, err
-	}
-
-	// 获取分页数据
-	err = query.Omit("password").Order("id desc").Limit(num).Offset(startIdx).Find(&users).Error
-	if err != nil {
-		tx.Rollback()
-		return nil, 0, err
-	}
-
-	// 提交事务
-	if err = tx.Commit().Error; err != nil {
-		return nil, 0, err
-	}
-
-	return users, total, nil
+	return GetAllUsersWithActivity(pageInfo, keyword, group, filter)
 }
 
 func GetUserById(id int, selectAll bool) (*User, error) {
@@ -953,9 +909,15 @@ func GetRootUser() (user *User) {
 	return user
 }
 
-func UpdateUserLastLoginAt(id int) {
-	if err := DB.Model(&User{}).Where("id = ?", id).Update("last_login_at", common.GetTimestamp()).Error; err != nil {
-		common.SysLog("failed to update user last_login_at: " + err.Error())
+func UpdateUserLastLoginInfo(id int, ip string) {
+	updates := map[string]interface{}{
+		"last_login_at": common.GetTimestamp(),
+	}
+	if strings.TrimSpace(ip) != "" {
+		updates["last_login_ip"] = strings.TrimSpace(ip)
+	}
+	if err := DB.Model(&User{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+		common.SysLog("failed to update user last_login_info: " + err.Error())
 	}
 }
 

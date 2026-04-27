@@ -84,10 +84,15 @@ func AddRedemption(c *gin.Context) {
 	var keys []string
 	for i := 0; i < redemption.Count; i++ {
 		key := common.GetUUID()
+		redemptionType := redemption.Type
+		if redemptionType == "" {
+			redemptionType = common.RedemptionTypeQuota
+		}
 		cleanRedemption := model.Redemption{
 			UserId:      c.GetInt("id"),
 			Name:        redemption.Name,
 			Key:         key,
+			Type:        redemptionType,
 			CreatedTime: common.GetTimestamp(),
 			Quota:       redemption.Quota,
 			ExpiredTime: redemption.ExpiredTime,
@@ -146,6 +151,10 @@ func UpdateRedemption(c *gin.Context) {
 		}
 		// If you add more fields, please also update redemption.Update()
 		cleanRedemption.Name = redemption.Name
+		cleanRedemption.Type = redemption.Type
+		if cleanRedemption.Type == "" {
+			cleanRedemption.Type = common.RedemptionTypeQuota
+		}
 		cleanRedemption.Quota = redemption.Quota
 		cleanRedemption.ExpiredTime = redemption.ExpiredTime
 	}
@@ -177,6 +186,96 @@ func DeleteInvalidRedemption(c *gin.Context) {
 		"data":    rows,
 	})
 	return
+}
+
+type validateInvitationCodeRequest struct {
+	Code string `json:"code"`
+}
+
+type markAnnouncementReadRequest struct {
+	AnnouncementId int `json:"announcement_id"`
+}
+
+func ValidateInvitationCode(c *gin.Context) {
+	var req validateInvitationCodeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if !common.InvitationCodeEnabled {
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "",
+			"data": gin.H{
+				"valid": false,
+				"error": "INVITATION_CODE_DISABLED",
+			},
+		})
+		return
+	}
+	_, err := model.ValidateInvitationCode(req.Code)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "",
+			"data": gin.H{
+				"valid": false,
+				"error": err.Error(),
+			},
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data": gin.H{
+			"valid": true,
+		},
+	})
+}
+
+func MarkAnnouncementRead(c *gin.Context) {
+	var req markAnnouncementReadRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Status(http.StatusOK)
+		return
+	}
+	if req.AnnouncementId <= 0 {
+		c.Status(http.StatusOK)
+		return
+	}
+	err := model.MarkAnnouncementRead(req.AnnouncementId, c.GetInt("id"))
+	if err != nil {
+		c.Status(http.StatusOK)
+		return
+	}
+	c.Status(http.StatusOK)
+}
+
+func GetAnnouncementReadStatus(c *gin.Context) {
+	announcementId, err := strconv.Atoi(c.Param("id"))
+	if err != nil || announcementId <= 0 {
+		common.ApiError(c, err)
+		return
+	}
+	keyword := c.Query("keyword")
+	status := c.DefaultQuery("status", "all")
+	pageInfo := common.GetPageQuery(c)
+	items, total, summary, err := model.GetAnnouncementReadStatus(announcementId, pageInfo.GetStartIdx(), pageInfo.GetPageSize(), keyword, status)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	pageInfo.SetTotal(int(total))
+	pageInfo.SetItems(items)
+	common.ApiSuccess(c, gin.H{
+		"page":       pageInfo.Page,
+		"page_size":  pageInfo.PageSize,
+		"total":      pageInfo.Total,
+		"items":      pageInfo.Items,
+		"status":     status,
+		"statistics": summary,
+	})
 }
 
 func validateExpiredTime(c *gin.Context, expired int64) (bool, string) {

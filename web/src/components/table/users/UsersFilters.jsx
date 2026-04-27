@@ -71,6 +71,44 @@ const UsersFilters = ({
             size='small'
           />
         </div>
+        <div className='w-full md:w-32'>
+          <Form.InputNumber
+            field='activityDays'
+            placeholder={t('天数')}
+            min={1}
+            max={3650}
+            pure
+            size='small'
+          />
+        </div>
+        <div className='w-full md:w-40'>
+          <Form.Select
+            field='consumeStatus'
+            placeholder={t('消费状态')}
+            optionList={[
+              { label: t('全部消费'), value: 'all' },
+              { label: t('有消费'), value: 'consumed' },
+              { label: t('无消费'), value: 'not_consumed' },
+            ]}
+            className='w-full'
+            pure
+            size='small'
+          />
+        </div>
+        <div className='w-full md:w-40'>
+          <Form.Select
+            field='checkinStatus'
+            placeholder={t('签到状态')}
+            optionList={[
+              { label: t('全部签到'), value: 'all' },
+              { label: t('已签到'), value: 'checked' },
+              { label: t('未签到'), value: 'not_checked' },
+            ]}
+            className='w-full'
+            pure
+            size='small'
+          />
+        </div>
         <div className='w-full md:w-48'>
           <Form.Select
             field='searchGroup'

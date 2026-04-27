@@ -16,6 +16,7 @@ type Redemption struct {
 	UserId       int            `json:"user_id"`
 	Key          string         `json:"key" gorm:"type:char(32);uniqueIndex"`
 	Status       int            `json:"status" gorm:"default:1"`
+	Type         string         `json:"type" gorm:"type:varchar(20);default:'quota';index"`
 	Name         string         `json:"name" gorm:"index"`
 	Quota        int            `json:"quota" gorm:"default:100"`
 	CreatedTime  int64          `json:"created_time" gorm:"bigint"`
@@ -134,6 +135,9 @@ func Redeem(key string, userId int) (quota int, err error) {
 		if redemption.Status != common.RedemptionCodeStatusEnabled {
 			return errors.New("该兑换码已被使用")
 		}
+		if redemption.Type != "" && redemption.Type != common.RedemptionTypeQuota {
+			return errors.New("该兑换码不能用于充值")
+		}
 		if redemption.ExpiredTime != 0 && redemption.ExpiredTime < common.GetTimestamp() {
 			return errors.New("该兑换码已过期")
 		}
@@ -156,6 +160,9 @@ func Redeem(key string, userId int) (quota int, err error) {
 }
 
 func (redemption *Redemption) Insert() error {
+	if redemption.Type == "" {
+		redemption.Type = common.RedemptionTypeQuota
+	}
 	var err error
 	err = DB.Create(redemption).Error
 	return err
@@ -169,7 +176,7 @@ func (redemption *Redemption) SelectUpdate() error {
 // Update Make sure your token's fields is completed, because this will update non-zero values
 func (redemption *Redemption) Update() error {
 	var err error
-	err = DB.Model(redemption).Select("name", "status", "quota", "redeemed_time", "expired_time").Updates(redemption).Error
+	err = DB.Model(redemption).Select("name", "status", "type", "quota", "redeemed_time", "expired_time").Updates(redemption).Error
 	return err
 }
 
@@ -195,4 +202,68 @@ func DeleteInvalidRedemptions() (int64, error) {
 	now := common.GetTimestamp()
 	result := DB.Where("status IN ? OR (status = ? AND expired_time != 0 AND expired_time < ?)", []int{common.RedemptionCodeStatusUsed, common.RedemptionCodeStatusDisabled}, common.RedemptionCodeStatusEnabled, now).Delete(&Redemption{})
 	return result.RowsAffected, result.Error
+}
+
+func ValidateInvitationCode(code string) (*Redemption, error) {
+	if code == "" {
+		return nil, errors.New("未提供邀请码")
+	}
+	redemption := &Redemption{}
+	keyCol := "`key`"
+	if common.UsingPostgreSQL {
+		keyCol = `"key"`
+	}
+	err := DB.Where(keyCol+" = ?", code).First(redemption).Error
+	if err != nil {
+		return nil, errors.New("无效的邀请码")
+	}
+	if redemption.Status != common.RedemptionCodeStatusEnabled {
+		return nil, errors.New("邀请码已被使用")
+	}
+	if redemption.Type == "" {
+		redemption.Type = common.RedemptionTypeQuota
+	}
+	if redemption.Type != common.RedemptionTypeInvitation {
+		return nil, errors.New("邀请码类型无效")
+	}
+	if redemption.ExpiredTime != 0 && redemption.ExpiredTime < common.GetTimestamp() {
+		return nil, errors.New("邀请码已过期")
+	}
+	return redemption, nil
+}
+
+func ConsumeInvitationCode(code string, userId int) error {
+	if code == "" {
+		return errors.New("未提供邀请码")
+	}
+	if userId == 0 {
+		return errors.New("无效的 user id")
+	}
+	keyCol := "`key`"
+	if common.UsingPostgreSQL {
+		keyCol = `"key"`
+	}
+	return DB.Transaction(func(tx *gorm.DB) error {
+		redemption := &Redemption{}
+		err := tx.Set("gorm:query_option", "FOR UPDATE").Where(keyCol+" = ?", code).First(redemption).Error
+		if err != nil {
+			return errors.New("无效的邀请码")
+		}
+		if redemption.Status != common.RedemptionCodeStatusEnabled {
+			return errors.New("邀请码已被使用")
+		}
+		if redemption.Type == "" {
+			redemption.Type = common.RedemptionTypeQuota
+		}
+		if redemption.Type != common.RedemptionTypeInvitation {
+			return errors.New("邀请码类型无效")
+		}
+		if redemption.ExpiredTime != 0 && redemption.ExpiredTime < common.GetTimestamp() {
+			return errors.New("邀请码已过期")
+		}
+		redemption.RedeemedTime = common.GetTimestamp()
+		redemption.Status = common.RedemptionCodeStatusUsed
+		redemption.UsedUserId = userId
+		return tx.Save(redemption).Error
+	})
 }

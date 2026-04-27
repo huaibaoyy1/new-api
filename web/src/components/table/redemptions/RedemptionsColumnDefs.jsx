@@ -73,6 +73,22 @@ const renderStatus = (status, record, t) => {
   );
 };
 
+const renderType = (type, t) => {
+  if (type === 'invitation') {
+    return (
+      <Tag color='purple' shape='circle'>
+        {t('注册邀请码')}
+      </Tag>
+    );
+  }
+
+  return (
+    <Tag color='blue' shape='circle'>
+      {t('充值兑换码')}
+    </Tag>
+  );
+};
+
 /**
  * Get redemption code table column definitions
  */
@@ -105,9 +121,26 @@ export const getRedemptionsColumns = ({
       },
     },
     {
+      title: t('类型'),
+      dataIndex: 'type',
+      render: (text) => {
+        return <div>{renderType(text, t)}</div>;
+      },
+    },
+    {
       title: t('额度'),
       dataIndex: 'quota',
-      render: (text) => {
+      render: (text, record) => {
+        if (record.type === 'invitation') {
+          return (
+            <div>
+              <Tag color='grey' shape='circle'>
+                {t('无额度')}
+              </Tag>
+            </div>
+          );
+        }
+
         return (
           <div>
             <Tag color='grey' shape='circle'>

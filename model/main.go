@@ -262,6 +262,7 @@ func migrateDB() error {
 		&PasskeyCredential{},
 		&Option{},
 		&Redemption{},
+		&AnnouncementRead{},
 		&Ability{},
 		&Log{},
 		&Midjourney{},
@@ -280,6 +281,9 @@ func migrateDB() error {
 		&SubscriptionPreConsumeRecord{},
 		&CustomOAuthProvider{},
 		&UserOAuthBinding{},
+		&LotteryActivity{},
+		&LotteryActivityRun{},
+		&LotteryWinner{},
 	)
 	if err != nil {
 		return err
@@ -310,6 +314,7 @@ func migrateDBFast() error {
 		{&PasskeyCredential{}, "PasskeyCredential"},
 		{&Option{}, "Option"},
 		{&Redemption{}, "Redemption"},
+		{&AnnouncementRead{}, "AnnouncementRead"},
 		{&Ability{}, "Ability"},
 		{&Log{}, "Log"},
 		{&Midjourney{}, "Midjourney"},
@@ -328,6 +333,9 @@ func migrateDBFast() error {
 		{&SubscriptionPreConsumeRecord{}, "SubscriptionPreConsumeRecord"},
 		{&CustomOAuthProvider{}, "CustomOAuthProvider"},
 		{&UserOAuthBinding{}, "UserOAuthBinding"},
+		{&LotteryActivity{}, "LotteryActivity"},
+		{&LotteryActivityRun{}, "LotteryActivityRun"},
+		{&LotteryWinner{}, "LotteryWinner"},
 	}
 	// 动态计算migration数量，确保errChan缓冲区足够大
 	errChan := make(chan error, len(migrations))

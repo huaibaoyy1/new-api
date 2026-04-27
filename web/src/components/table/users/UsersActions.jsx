@@ -18,19 +18,63 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React from 'react';
-import { Button } from '@douyinfe/semi-ui';
+import { Button, Popconfirm, Space, Typography } from '@douyinfe/semi-ui';
 
-const UsersActions = ({ setShowAddUser, t }) => {
+const UsersActions = ({
+  setShowAddUser,
+  exportActivityCSV,
+  selectedUserIds,
+  batchManageUsers,
+  t,
+}) => {
   // Add new user
   const handleAddUser = () => {
     setShowAddUser(true);
   };
 
   return (
-    <div className='flex gap-2 w-full md:w-auto order-2 md:order-1'>
+    <div className='flex flex-col md:flex-row gap-2 w-full md:w-auto order-2 md:order-1'>
       <Button className='w-full md:w-auto' onClick={handleAddUser} size='small'>
         {t('添加用户')}
       </Button>
+      <Button
+        className='w-full md:w-auto'
+        onClick={exportActivityCSV}
+        size='small'
+        type='secondary'
+      >
+        {t('导出 CSV')}
+      </Button>
+      <Space spacing={8} wrap>
+        <Typography.Text type='secondary' size='small'>
+          {t('已选 {{count}} 个用户', { count: selectedUserIds.length })}
+        </Typography.Text>
+        <Popconfirm
+          title={t('确认批量禁用选中的用户吗？')}
+          onConfirm={() => batchManageUsers('disable')}
+        >
+          <Button
+            className='w-full md:w-auto'
+            size='small'
+            type='danger'
+            disabled={!selectedUserIds.length}
+          >
+            {t('批量禁用')}
+          </Button>
+        </Popconfirm>
+        <Popconfirm
+          title={t('确认批量启用选中的用户吗？')}
+          onConfirm={() => batchManageUsers('enable')}
+        >
+          <Button
+            className='w-full md:w-auto'
+            size='small'
+            disabled={!selectedUserIds.length}
+          >
+            {t('批量启用')}
+          </Button>
+        </Popconfirm>
+      </Space>
     </div>
   );
 };

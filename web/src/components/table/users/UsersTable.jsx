@@ -51,6 +51,8 @@ const UsersTable = (usersData) => {
     resetUserPasskey,
     resetUserTwoFA,
     t,
+    selectedUserIds,
+    setSelectedUserIds,
   } = usersData;
 
   // Modal states
@@ -174,6 +176,10 @@ const UsersTable = (usersData) => {
         columns={tableColumns}
         dataSource={users}
         scroll={compactMode ? undefined : { x: 'max-content' }}
+        rowSelection={{
+          selectedRowKeys: selectedUserIds,
+          onChange: (selectedRowKeys) => setSelectedUserIds(selectedRowKeys),
+        }}
         pagination={{
           currentPage: activePage,
           pageSize: pageSize,

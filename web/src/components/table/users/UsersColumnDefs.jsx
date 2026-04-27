@@ -38,6 +38,50 @@ import {
 
 const renderTimestamp = (text) => (text ? timestamp2string(text) : '-');
 
+const renderActivityTag = (checkedIn, checkinCount, t) => {
+  return (
+    <Tag color={checkedIn ? 'green' : 'grey'} shape='circle'>
+      {checkedIn
+        ? `${t('已签到')} (${renderNumber(checkinCount || 0)})`
+        : t('未签到')}
+    </Tag>
+  );
+};
+
+const renderConsumeSummary = (record, t) => {
+  const totalTokens = Number(record.total_tokens || 0);
+  const totalQuota = Number(record.total_consume_quota || 0);
+  const consumeCount = Number(record.consume_count || 0);
+  return (
+    <Tooltip
+      content={
+        <div className='text-xs'>
+          <div>
+            {t('消费次数')}: {renderNumber(consumeCount)}
+          </div>
+          <div>
+            {t('消费额度')}: {renderQuota(totalQuota)}
+          </div>
+          <div>
+            {t('总 Token')}: {renderNumber(totalTokens)}
+          </div>
+        </div>
+      }
+      position='top'
+      showArrow
+    >
+      <Space spacing={2}>
+        <Tag color={consumeCount > 0 ? 'blue' : 'grey'} shape='circle'>
+          {consumeCount > 0 ? t('有消费') : t('无消费')}
+        </Tag>
+        <Tag color='white' shape='circle' className='!text-xs'>
+          {t('Token')}: {renderNumber(totalTokens)}
+        </Tag>
+      </Space>
+    </Tooltip>
+  );
+};
+
 /**
  * Render user role
  */
@@ -358,6 +402,17 @@ export const getUsersColumns = ({
       render: (text, record, index) => renderInviteInfo(text, record, t),
     },
     {
+      title: t('消费情况'),
+      key: 'consume_summary',
+      render: (text, record) => renderConsumeSummary(record, t),
+    },
+    {
+      title: t('签到情况'),
+      key: 'checkin_summary',
+      render: (text, record) =>
+        renderActivityTag(record.checked_in, record.checkin_count, t),
+    },
+    {
       title: t('创建时间'),
       dataIndex: 'created_at',
       render: renderTimestamp,
@@ -366,6 +421,11 @@ export const getUsersColumns = ({
       title: t('最后登录'),
       dataIndex: 'last_login_at',
       render: renderTimestamp,
+    },
+    {
+      title: t('登录 IP'),
+      dataIndex: 'last_login_ip',
+      render: (text) => text || '-',
     },
     {
       title: '',

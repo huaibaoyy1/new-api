@@ -32,10 +32,15 @@ const FooterBar = () => {
   const isDemoSiteMode = statusState?.status?.demo_site_enabled || false;
 
   const loadFooter = () => {
-    let footer_html = localStorage.getItem('footer_html');
-    if (footer_html) {
-      setFooter(footer_html);
+    const footerFromStatus = statusState?.status?.footer_html;
+    if (footerFromStatus !== undefined && footerFromStatus !== null) {
+      setFooter(footerFromStatus);
+      localStorage.setItem('footer_html', footerFromStatus);
+      return;
     }
+
+    const footer_html = localStorage.getItem('footer_html');
+    setFooter(footer_html || '');
   };
 
   const currentYear = new Date().getFullYear();
@@ -216,7 +221,7 @@ const FooterBar = () => {
 
   useEffect(() => {
     loadFooter();
-  }, []);
+  }, [statusState?.status?.footer_html]);
 
   return (
     <div className='w-full'>

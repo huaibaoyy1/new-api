@@ -721,6 +721,45 @@ html.dark .sbg-variant-green {
   -webkit-text-fill-color: transparent;
 }
 
+.unread-announcement {
+  color: var(--semi-color-text-0);
+}
+
+.unread-announcement p,
+.unread-announcement li,
+.unread-announcement strong,
+.unread-announcement em,
+.unread-announcement code,
+.unread-announcement blockquote,
+.unread-announcement h1,
+.unread-announcement h2,
+.unread-announcement h3,
+.unread-announcement h4,
+.unread-announcement h5,
+.unread-announcement h6,
+.unread-announcement span {
+  color: inherit;
+}
+
+.unread-announcement ul,
+.unread-announcement ol {
+  color: inherit;
+}
+
+.unread-announcement li::marker {
+  color: var(--semi-color-primary);
+}
+
+.unread-announcement a {
+  color: var(--semi-color-link);
+}
+
+.unread-announcement img,
+.unread-announcement svg,
+.unread-announcement emoji {
+  color: initial;
+}
+
 /* ==================== ScrollList 定制样式 ==================== */
 .semi-scrolllist,
 .semi-scrolllist * {
@@ -846,11 +885,26 @@ html.dark .with-pastel-balls::before {
   flex-direction: column;
   height: calc(100vh - 110px);
   max-height: calc(100vh - 110px);
+  overflow: visible !important;
 }
 
 .table-scroll-card .semi-card-body {
   flex: 1 1 auto;
   overflow-y: auto;
+}
+
+.table-scroll-card .semi-card-footer {
+  overflow: visible !important;
+  position: relative;
+  z-index: 20;
+}
+
+.table-scroll-card .semi-pagination,
+.table-scroll-card .semi-pagination-outer,
+.table-scroll-card .semi-select,
+.table-scroll-card .semi-select-selection,
+.table-scroll-card .semi-select-selection-text {
+  overflow: visible !important;
 }
 
 .table-scroll-card .semi-card-body::-webkit-scrollbar {
