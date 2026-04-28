@@ -364,3 +364,130 @@ func multipartMemoryLimit() int64 {
 	}
 	return int64(limitMB) << 20
 }
+
+func clipPreviewText(text string, maxChars int) (string, bool) {
+	text = strings.TrimSpace(text)
+	if maxChars <= 0 {
+		maxChars = 2048
+	}
+	runes := []rune(text)
+	if len(runes) <= maxChars {
+		return text, false
+	}
+	return string(runes[:maxChars]) + "...[truncated]", true
+}
+
+func summarizeRequestContent(value any) string {
+	switch v := value.(type) {
+	case string:
+		return strings.TrimSpace(v)
+	case []interface{}:
+		parts := make([]string, 0, len(v))
+		for _, item := range v {
+			itemText := summarizeRequestContent(item)
+			if itemText != "" {
+				parts = append(parts, itemText)
+			}
+		}
+		return strings.Join(parts, "\n")
+	case map[string]interface{}:
+		if text, ok := v["text"].(string); ok {
+			return strings.TrimSpace(text)
+		}
+		if inputText, ok := v["input_text"].(string); ok {
+			return strings.TrimSpace(inputText)
+		}
+		if content, ok := v["content"]; ok {
+			return summarizeRequestContent(content)
+		}
+		if imageURL, ok := v["image_url"]; ok && imageURL != nil {
+			return "[image omitted]"
+		}
+		if _, ok := v["image"]; ok {
+			return "[image omitted]"
+		}
+		if _, ok := v["input_audio"]; ok {
+			return "[audio omitted]"
+		}
+		if _, ok := v["audio"]; ok {
+			return "[audio omitted]"
+		}
+		if _, ok := v["file"]; ok {
+			return "[file omitted]"
+		}
+		if _, ok := v["data"]; ok {
+			return "[binary data omitted]"
+		}
+		if parts, ok := v["parts"]; ok {
+			return summarizeRequestContent(parts)
+		}
+	}
+	return ""
+}
+
+func buildStructuredRequestPreview(payload map[string]interface{}) string {
+	lines := make([]string, 0, 16)
+	if model, ok := payload["model"].(string); ok && strings.TrimSpace(model) != "" {
+		lines = append(lines, "model: "+strings.TrimSpace(model))
+	}
+	if prompt, ok := payload["prompt"].(string); ok && strings.TrimSpace(prompt) != "" {
+		lines = append(lines, "prompt: "+strings.TrimSpace(prompt))
+	}
+	if input, ok := payload["input"]; ok {
+		if text := summarizeRequestContent(input); text != "" {
+			lines = append(lines, "input: "+text)
+		}
+	}
+	if contents, ok := payload["contents"]; ok {
+		if text := summarizeRequestContent(contents); text != "" {
+			lines = append(lines, "contents: "+text)
+		}
+	}
+	if messages, ok := payload["messages"].([]interface{}); ok {
+		for _, item := range messages {
+			msgMap, ok := item.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			role, _ := msgMap["role"].(string)
+			content := summarizeRequestContent(msgMap["content"])
+			if content == "" {
+				continue
+			}
+			if strings.TrimSpace(role) == "" {
+				role = "message"
+			}
+			lines = append(lines, fmt.Sprintf("[%s] %s", role, content))
+		}
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
+func BuildRequestPreview(c *gin.Context, maxChars int) (preview string, truncated bool, bodySize int64, contentType string, err error) {
+	storage, err := GetBodyStorage(c)
+	if err != nil {
+		return "", false, 0, "", err
+	}
+	bodySize = storage.Size()
+	contentType = c.Request.Header.Get("Content-Type")
+	data, err := storage.Bytes()
+	if err != nil {
+		return "", false, bodySize, contentType, err
+	}
+	if len(data) == 0 {
+		return "", false, bodySize, contentType, nil
+	}
+
+	var rawPreview string
+	if strings.Contains(strings.ToLower(contentType), "json") {
+		var payload map[string]interface{}
+		if err = Unmarshal(data, &payload); err == nil {
+			rawPreview = buildStructuredRequestPreview(payload)
+		}
+	}
+	if rawPreview == "" {
+		rawPreview = string(data)
+	}
+	preview, truncated = clipPreviewText(rawPreview, maxChars)
+	return preview, truncated, bodySize, contentType, nil
+}

@@ -375,6 +375,20 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 		other["channel_id"] = channelId
 		other["channel_name"] = c.GetString("channel_name")
 		other["channel_type"] = c.GetInt("channel_type")
+		if requestPreview, truncated, bodySize, contentType, previewErr := common.BuildRequestPreview(c, 2048); previewErr == nil {
+			if strings.TrimSpace(requestPreview) != "" {
+				other["request_preview"] = requestPreview
+				other["request_preview_truncated"] = truncated
+			}
+			if bodySize > 0 {
+				other["request_body_size"] = bodySize
+			}
+			if strings.TrimSpace(contentType) != "" {
+				other["request_content_type"] = contentType
+			}
+		} else {
+			other["request_preview_error"] = previewErr.Error()
+		}
 		adminInfo := make(map[string]interface{})
 		adminInfo["use_channel"] = c.GetStringSlice("use_channel")
 		isMultiKey := common.GetContextKeyBool(c, constant.ContextKeyChannelIsMultiKey)

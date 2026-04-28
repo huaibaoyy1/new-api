@@ -220,7 +220,7 @@ func GetAllUsersWithActivity(pageInfo *common.PageInfo, keyword string, group st
 		return nil, 0, err
 	}
 
-	fillUserActivityFields(users)
+	fillUserActivityFields(users, filter.Days)
 
 	if err = tx.Commit().Error; err != nil {
 		return nil, 0, err

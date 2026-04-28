@@ -48,6 +48,16 @@ export const useUsersData = () => {
     checked_users: 0,
     not_checked_users: 0,
   });
+  const [showUserRiskModal, setShowUserRiskModal] = useState(false);
+  const [riskUser, setRiskUser] = useState(null);
+  const [riskSummary, setRiskSummary] = useState(null);
+  const [riskLogs, setRiskLogs] = useState([]);
+  const [riskLoading, setRiskLoading] = useState(false);
+  const [riskPagination, setRiskPagination] = useState({
+    page: 0,
+    pageSize: 10,
+    total: 0,
+  });
 
   // Modal states
   const [showAddUser, setShowAddUser] = useState(false);
@@ -361,6 +371,71 @@ export const useUsersData = () => {
     }
   };
 
+  const loadUserRiskDetail = async (
+    user,
+    page = 0,
+    pageSize = riskPagination.pageSize,
+  ) => {
+    if (!user?.id) return;
+    const { activityDays } = getFormValues();
+    setRiskLoading(true);
+    try {
+      const [summaryRes, logsRes] = await Promise.all([
+        API.get(`/api/user/${user.id}/request_risk`, {
+          params: {
+            days: activityDays || 1,
+          },
+        }),
+        API.get(`/api/user/${user.id}/request_risk_logs`, {
+          params: {
+            days: activityDays || 1,
+            p: page,
+            page_size: pageSize,
+          },
+        }),
+      ]);
+
+      if (summaryRes.data.success) {
+        setRiskSummary(summaryRes.data.data);
+      } else {
+        showError(summaryRes.data.message);
+      }
+
+      if (logsRes.data.success) {
+        setRiskLogs(logsRes.data.data?.items || []);
+        setRiskPagination({
+          page,
+          pageSize,
+          total: logsRes.data.data?.total || 0,
+        });
+      } else {
+        showError(logsRes.data.message);
+      }
+    } catch (error) {
+      showError(error.message);
+    } finally {
+      setRiskLoading(false);
+    }
+  };
+
+  const openUserRiskModal = async (user) => {
+    setRiskUser(user);
+    setShowUserRiskModal(true);
+    await loadUserRiskDetail(user, 0, riskPagination.pageSize);
+  };
+
+  const closeUserRiskModal = () => {
+    setShowUserRiskModal(false);
+    setRiskUser(null);
+    setRiskSummary(null);
+    setRiskLogs([]);
+    setRiskPagination({
+      page: 0,
+      pageSize: 10,
+      total: 0,
+    });
+  };
+
   // Refresh data
   const refresh = async (page = activePage) => {
     const {
@@ -441,6 +516,12 @@ export const useUsersData = () => {
     showAddUser,
     showEditUser,
     editingUser,
+    showUserRiskModal,
+    riskUser,
+    riskSummary,
+    riskLogs,
+    riskLoading,
+    riskPagination,
     setShowAddUser,
     setShowEditUser,
     setEditingUser,
@@ -470,6 +551,9 @@ export const useUsersData = () => {
     loadActivitySummary,
     exportActivityCSV,
     batchManageUsers,
+    openUserRiskModal,
+    closeUserRiskModal,
+    loadUserRiskDetail,
 
     // Translation
     t,

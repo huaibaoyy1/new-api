@@ -82,6 +82,50 @@ const renderConsumeSummary = (record, t) => {
   );
 };
 
+const renderRiskSummary = (record, openUserRiskModal, t) => {
+  const riskLevel = record.risk_level || 'low';
+  const riskColorMap = {
+    low: 'green',
+    medium: 'orange',
+    high: 'red',
+  };
+  const riskTextMap = {
+    low: t('低风险'),
+    medium: t('中风险'),
+    high: t('高风险'),
+  };
+
+  return (
+    <div className='flex flex-col gap-1'>
+      <Space spacing={4} wrap>
+        <Tag color={riskColorMap[riskLevel] || 'grey'} shape='circle'>
+          {riskTextMap[riskLevel] || t('未知')}
+        </Tag>
+        <Tag color='white' shape='circle' className='!text-xs'>
+          {t('错误率')}: {Number(record.error_rate || 0).toFixed(1)}%
+        </Tag>
+      </Space>
+      <Space spacing={4} wrap>
+        <Tag color='red' shape='circle' className='!text-xs'>
+          429: {record.status_429 || 0}
+        </Tag>
+        <Tag color='orange' shape='circle' className='!text-xs'>
+          403/401: {(record.status_403 || 0) + (record.status_401 || 0)}
+        </Tag>
+      </Space>
+      <Button
+        theme='borderless'
+        type='tertiary'
+        size='small'
+        onClick={() => openUserRiskModal(record)}
+        style={{ paddingLeft: 0, justifyContent: 'flex-start' }}
+      >
+        {t('风控详情')}
+      </Button>
+    </div>
+  );
+};
+
 /**
  * Render user role
  */
@@ -149,7 +193,6 @@ const renderUsername = (text, record) => {
 const renderStatistics = (text, record, showEnableDisableModal, t) => {
   const isDeleted = record.DeletedAt !== null;
 
-  // Determine tag text & color like original status column
   let tagColor = 'grey';
   let tagText = t('未知状态');
   if (isDeleted) {
@@ -184,7 +227,6 @@ const renderStatistics = (text, record, showEnableDisableModal, t) => {
   );
 };
 
-// Render separate quota usage column
 const renderQuotaUsage = (text, record, t) => {
   const { Paragraph } = Typography;
   const used = parseInt(record.used_quota) || 0;
@@ -360,6 +402,7 @@ export const getUsersColumns = ({
   showResetPasskeyModal,
   showResetTwoFAModal,
   showUserSubscriptionsModal,
+  openUserRiskModal,
 }) => {
   return [
     {
@@ -411,6 +454,11 @@ export const getUsersColumns = ({
       key: 'checkin_summary',
       render: (text, record) =>
         renderActivityTag(record.checked_in, record.checkin_count, t),
+    },
+    {
+      title: t('请求风险'),
+      key: 'request_risk',
+      render: (text, record) => renderRiskSummary(record, openUserRiskModal, t),
     },
     {
       title: t('创建时间'),

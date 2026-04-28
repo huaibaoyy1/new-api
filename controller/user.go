@@ -350,6 +350,7 @@ func ExportUserActivityCSV(c *gin.Context) {
 		"当前时间范围是否签到",
 		"创建时间",
 		"最后登录时间",
+		"最后登录IP",
 	}
 	if err := writer.Write(header); err != nil {
 		common.ApiError(c, err)
@@ -412,6 +413,39 @@ func ExportUserActivityCSV(c *gin.Context) {
 			return
 		}
 	}
+}
+
+func GetUserRequestRiskSummary(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	days, _ := strconv.Atoi(c.DefaultQuery("days", "7"))
+	summary, err := model.GetUserRequestRiskSummary(id, days)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, summary)
+}
+
+func GetUserRequestRiskLogs(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	days, _ := strconv.Atoi(c.DefaultQuery("days", "7"))
+	pageInfo := common.GetPageQuery(c)
+	items, total, err := model.GetUserRiskLogs(id, days, pageInfo.GetStartIdx(), pageInfo.GetPageSize())
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	pageInfo.SetTotal(int(total))
+	pageInfo.SetItems(items)
+	common.ApiSuccess(c, pageInfo)
 }
 
 func GetUser(c *gin.Context) {

@@ -15,11 +15,20 @@ type UserActivityFilter struct {
 
 type UserActivityRow struct {
 	User
-	TotalTokens       int64 `json:"total_tokens"`
-	TotalConsumeQuota int64 `json:"total_consume_quota"`
-	ConsumeCount      int64 `json:"consume_count"`
-	CheckinCount      int64 `json:"checkin_count"`
-	CheckedIn         bool  `json:"checked_in"`
+	TotalTokens       int64   `json:"total_tokens"`
+	TotalConsumeQuota int64   `json:"total_consume_quota"`
+	ConsumeCount      int64   `json:"consume_count"`
+	CheckinCount      int64   `json:"checkin_count"`
+	CheckedIn         bool    `json:"checked_in"`
+	RiskLevel         string  `json:"risk_level"`
+	ErrorRate         float64 `json:"error_rate"`
+	Status429         int     `json:"status_429"`
+	Status401         int     `json:"status_401"`
+	Status403         int     `json:"status_403"`
+	Status422         int     `json:"status_422"`
+	ErrorCount        int     `json:"error_count"`
+	SuccessCount      int     `json:"success_count"`
+	TotalRequests     int     `json:"total_requests"`
 }
 
 type UserActivitySummary struct {
@@ -114,9 +123,28 @@ COALESCE(checkin_stats.checkin_count, 0) AS checkin_count`).
 	return query
 }
 
-func fillUserActivityFields(users []*UserActivityRow) {
+func fillUserActivityFields(users []*UserActivityRow, days int) {
+	userIds := make([]int, 0, len(users))
 	for _, user := range users {
 		user.CheckedIn = user.CheckinCount > 0
+		userIds = append(userIds, user.Id)
+	}
+	riskSummaryMap, err := GetUsersRequestRiskSummary(userIds, days)
+	if err != nil {
+		return
+	}
+	for _, user := range users {
+		if risk, ok := riskSummaryMap[user.Id]; ok && risk != nil {
+			user.RiskLevel = risk.RiskLevel
+			user.ErrorRate = risk.ErrorRate
+			user.Status429 = risk.Status429
+			user.Status401 = risk.Status401
+			user.Status403 = risk.Status403
+			user.Status422 = risk.Status422
+			user.ErrorCount = risk.ErrorCount
+			user.SuccessCount = risk.SuccessCount
+			user.TotalRequests = risk.TotalRequests
+		}
 	}
 }
 
@@ -138,7 +166,7 @@ func GetAllUsersActivity(keyword string, group string, filter UserActivityFilter
 		return nil, err
 	}
 
-	fillUserActivityFields(users)
+	fillUserActivityFields(users, filter.Days)
 
 	if err := tx.Commit().Error; err != nil {
 		return nil, err

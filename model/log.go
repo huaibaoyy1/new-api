@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -37,6 +38,44 @@ type Log struct {
 	Ip               string `json:"ip" gorm:"index;default:''"`
 	RequestId        string `json:"request_id,omitempty" gorm:"type:varchar(64);index:idx_logs_request_id;default:''"`
 	Other            string `json:"other"`
+}
+
+type UserRequestRiskSummary struct {
+	UserId       int     `json:"user_id"`
+	TotalRequests int    `json:"total_requests"`
+	SuccessCount int     `json:"success_count"`
+	ErrorCount   int     `json:"error_count"`
+	Status2xx    int     `json:"status_2xx"`
+	Status4xx    int     `json:"status_4xx"`
+	Status5xx    int     `json:"status_5xx"`
+	Status401    int     `json:"status_401"`
+	Status403    int     `json:"status_403"`
+	Status422    int     `json:"status_422"`
+	Status429    int     `json:"status_429"`
+	ErrorRate    float64 `json:"error_rate"`
+	RiskLevel    string  `json:"risk_level"`
+}
+
+type UserRiskLogItem struct {
+	Id                      int    `json:"id"`
+	CreatedAt               int64  `json:"created_at"`
+	StatusCode              int    `json:"status_code"`
+	ErrorCode               string `json:"error_code"`
+	Content                 string `json:"content"`
+	ModelName               string `json:"model_name"`
+	TokenName               string `json:"token_name"`
+	Quota                   int    `json:"quota"`
+	UseTime                 int    `json:"use_time"`
+	IsStream                bool   `json:"is_stream"`
+	ChannelId               int    `json:"channel_id"`
+	ChannelName             string `json:"channel_name"`
+	Ip                      string `json:"ip"`
+	RequestId               string `json:"request_id"`
+	Group                   string `json:"group"`
+	RequestPreview          string `json:"request_preview"`
+	RequestPreviewTruncated bool   `json:"request_preview_truncated"`
+	RequestBodySize         int64  `json:"request_body_size"`
+	RequestContentType      string `json:"request_content_type"`
 }
 
 // don't use iota, avoid change log type value
@@ -507,6 +546,280 @@ func SumUsedToken(logType int, startTimestamp int64, endTimestamp int64, modelNa
 	}
 	tx.Where("type = ?", LogTypeConsume).Scan(&token)
 	return token
+}
+
+func parseRiskStatusCode(log *Log) int {
+	if log == nil {
+		return 0
+	}
+	if log.Type == LogTypeConsume {
+		return 200
+	}
+	otherMap, _ := common.StrToMap(log.Other)
+	if otherMap == nil {
+		return 0
+	}
+	raw, ok := otherMap["status_code"]
+	if !ok {
+		return 0
+	}
+	switch v := raw.(type) {
+	case int:
+		return v
+	case int32:
+		return int(v)
+	case int64:
+		return int(v)
+	case float64:
+		return int(v)
+	case string:
+		return common.String2Int(v)
+	}
+	return 0
+}
+
+func parseRiskErrorCode(log *Log) string {
+	if log == nil {
+		return ""
+	}
+	otherMap, _ := common.StrToMap(log.Other)
+	if otherMap == nil {
+		return ""
+	}
+	raw, ok := otherMap["error_code"]
+	if !ok {
+		return ""
+	}
+	if value, ok := raw.(string); ok {
+		return value
+	}
+	return fmt.Sprintf("%v", raw)
+}
+
+func parseRiskOtherMap(log *Log) map[string]interface{} {
+	if log == nil {
+		return nil
+	}
+	otherMap, _ := common.StrToMap(log.Other)
+	return otherMap
+}
+
+func fillRiskSummary(summary *UserRequestRiskSummary) {
+	if summary == nil {
+		return
+	}
+	summary.TotalRequests = summary.SuccessCount + summary.ErrorCount
+	if summary.TotalRequests <= 0 {
+		summary.ErrorRate = 0
+		summary.RiskLevel = "low"
+		return
+	}
+	summary.ErrorRate = float64(summary.ErrorCount) * 100 / float64(summary.TotalRequests)
+	switch {
+	case summary.Status429 >= 20 || summary.Status401+summary.Status403 >= 10 || summary.Status4xx*100 >= summary.TotalRequests*30 || (summary.ErrorCount >= 50 && summary.ErrorCount*100 >= summary.TotalRequests*20):
+		summary.RiskLevel = "high"
+	case summary.Status429 >= 5 || summary.Status4xx*100 >= summary.TotalRequests*10 || summary.Status422 >= 10:
+		summary.RiskLevel = "medium"
+	default:
+		summary.RiskLevel = "low"
+	}
+}
+
+func GetUserRequestRiskSummary(userId int, days int) (*UserRequestRiskSummary, error) {
+	if days <= 0 {
+		days = 7
+	}
+	startTimestamp := time.Now().AddDate(0, 0, -days).Unix()
+	var logs []*Log
+	err := LOG_DB.Where("user_id = ? AND created_at >= ? AND type IN ?", userId, startTimestamp, []int{LogTypeConsume, LogTypeError}).
+		Order("id desc").
+		Find(&logs).Error
+	if err != nil {
+		return nil, err
+	}
+	summary := &UserRequestRiskSummary{UserId: userId}
+	for _, log := range logs {
+		statusCode := parseRiskStatusCode(log)
+		if log.Type == LogTypeConsume {
+			summary.SuccessCount++
+			summary.Status2xx++
+			continue
+		}
+		summary.ErrorCount++
+		switch {
+		case statusCode >= 200 && statusCode < 300:
+			summary.Status2xx++
+			summary.SuccessCount++
+			summary.ErrorCount--
+		case statusCode >= 400 && statusCode < 500:
+			summary.Status4xx++
+		case statusCode >= 500 && statusCode < 600:
+			summary.Status5xx++
+		}
+		switch statusCode {
+		case 401:
+			summary.Status401++
+		case 403:
+			summary.Status403++
+		case 422:
+			summary.Status422++
+		case 429:
+			summary.Status429++
+		}
+	}
+	fillRiskSummary(summary)
+	return summary, nil
+}
+
+func GetUsersRequestRiskSummary(userIds []int, days int) (map[int]*UserRequestRiskSummary, error) {
+	result := make(map[int]*UserRequestRiskSummary, len(userIds))
+	if len(userIds) == 0 {
+		return result, nil
+	}
+	if days <= 0 {
+		days = 7
+	}
+	startTimestamp := time.Now().AddDate(0, 0, -days).Unix()
+	var logs []*Log
+	err := LOG_DB.Where("user_id IN ? AND created_at >= ? AND type IN ?", userIds, startTimestamp, []int{LogTypeConsume, LogTypeError}).
+		Order("id desc").
+		Find(&logs).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, userId := range userIds {
+		result[userId] = &UserRequestRiskSummary{UserId: userId, RiskLevel: "low"}
+	}
+	for _, log := range logs {
+		summary, ok := result[log.UserId]
+		if !ok {
+			summary = &UserRequestRiskSummary{UserId: log.UserId, RiskLevel: "low"}
+			result[log.UserId] = summary
+		}
+		statusCode := parseRiskStatusCode(log)
+		if log.Type == LogTypeConsume {
+			summary.SuccessCount++
+			summary.Status2xx++
+			continue
+		}
+		summary.ErrorCount++
+		switch {
+		case statusCode >= 200 && statusCode < 300:
+			summary.Status2xx++
+			summary.SuccessCount++
+			summary.ErrorCount--
+		case statusCode >= 400 && statusCode < 500:
+			summary.Status4xx++
+		case statusCode >= 500 && statusCode < 600:
+			summary.Status5xx++
+		}
+		switch statusCode {
+		case 401:
+			summary.Status401++
+		case 403:
+			summary.Status403++
+		case 422:
+			summary.Status422++
+		case 429:
+			summary.Status429++
+		}
+	}
+	for _, summary := range result {
+		fillRiskSummary(summary)
+	}
+	return result, nil
+}
+
+func GetUserRiskLogs(userId int, days int, startIdx int, num int) ([]*UserRiskLogItem, int64, error) {
+	if days <= 0 {
+		days = 7
+	}
+	startTimestamp := time.Now().AddDate(0, 0, -days).Unix()
+	var logs []*Log
+	err := LOG_DB.Where("user_id = ? AND created_at >= ? AND type = ?", userId, startTimestamp, LogTypeError).
+		Order("id desc").
+		Find(&logs).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	items := make([]*UserRiskLogItem, 0, len(logs))
+	channelIds := types.NewSet[int]()
+	for _, log := range logs {
+		statusCode := parseRiskStatusCode(log)
+		if statusCode >= 200 && statusCode < 300 {
+			continue
+		}
+		otherMap := parseRiskOtherMap(log)
+		item := &UserRiskLogItem{
+			Id:         log.Id,
+			CreatedAt:  log.CreatedAt,
+			StatusCode: statusCode,
+			ErrorCode:  parseRiskErrorCode(log),
+			Content:    log.Content,
+			ModelName:  log.ModelName,
+			TokenName:  log.TokenName,
+			Quota:      log.Quota,
+			UseTime:    log.UseTime,
+			IsStream:   log.IsStream,
+			ChannelId:  log.ChannelId,
+			Ip:         log.Ip,
+			RequestId:  log.RequestId,
+			Group:      log.Group,
+		}
+		if otherMap != nil {
+			if preview, ok := otherMap["request_preview"].(string); ok {
+				item.RequestPreview = preview
+			}
+			if truncated, ok := otherMap["request_preview_truncated"].(bool); ok {
+				item.RequestPreviewTruncated = truncated
+			}
+			switch v := otherMap["request_body_size"].(type) {
+			case int:
+				item.RequestBodySize = int64(v)
+			case int32:
+				item.RequestBodySize = int64(v)
+			case int64:
+				item.RequestBodySize = v
+			case float64:
+				item.RequestBodySize = int64(v)
+			}
+			if contentType, ok := otherMap["request_content_type"].(string); ok {
+				item.RequestContentType = contentType
+			}
+		}
+		if log.ChannelId != 0 {
+			channelIds.Add(log.ChannelId)
+		}
+		items = append(items, item)
+	}
+	if channelIds.Len() > 0 {
+		var channels []struct {
+			Id   int    `gorm:"column:id"`
+			Name string `gorm:"column:name"`
+		}
+		if err = DB.Table("channels").Select("id, name").Where("id IN ?", channelIds.Items()).Find(&channels).Error; err != nil {
+			return nil, 0, err
+		}
+		channelMap := make(map[int]string, len(channels))
+		for _, channel := range channels {
+			channelMap[channel.Id] = channel.Name
+		}
+		for _, item := range items {
+			item.ChannelName = channelMap[item.ChannelId]
+		}
+	}
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].Id > items[j].Id
+	})
+	total := int64(len(items))
+	if startIdx >= len(items) {
+		return []*UserRiskLogItem{}, total, nil
+	}
+	endIdx := startIdx + num
+	if endIdx > len(items) {
+		endIdx = len(items)
+	}
+	return items[startIdx:endIdx], total, nil
 }
 
 func DeleteOldLog(ctx context.Context, targetTimestamp int64, limit int) (int64, error) {
