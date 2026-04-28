@@ -13,6 +13,15 @@ type UserActivityFilter struct {
 	CheckinStatus string
 }
 
+type UserActivityRow struct {
+	User
+	TotalTokens       int64 `json:"total_tokens"`
+	TotalConsumeQuota int64 `json:"total_consume_quota"`
+	ConsumeCount      int64 `json:"consume_count"`
+	CheckinCount      int64 `json:"checkin_count"`
+	CheckedIn         bool  `json:"checked_in"`
+}
+
 type UserActivitySummary struct {
 	TotalUsers       int64 `json:"total_users"`
 	ConsumedUsers    int64 `json:"consumed_users"`
@@ -105,13 +114,13 @@ COALESCE(checkin_stats.checkin_count, 0) AS checkin_count`).
 	return query
 }
 
-func fillUserActivityFields(users []*User) {
+func fillUserActivityFields(users []*UserActivityRow) {
 	for _, user := range users {
 		user.CheckedIn = user.CheckinCount > 0
 	}
 }
 
-func GetAllUsersActivity(keyword string, group string, filter UserActivityFilter) ([]*User, error) {
+func GetAllUsersActivity(keyword string, group string, filter UserActivityFilter) ([]*UserActivityRow, error) {
 	tx := DB.Begin()
 	if tx.Error != nil {
 		return nil, tx.Error
@@ -122,7 +131,7 @@ func GetAllUsersActivity(keyword string, group string, filter UserActivityFilter
 		}
 	}()
 
-	var users []*User
+	var users []*UserActivityRow
 	query := buildUserActivityQuery(tx, keyword, group, filter)
 	if err := query.Order("users.id desc").Omit("password").Find(&users).Error; err != nil {
 		tx.Rollback()

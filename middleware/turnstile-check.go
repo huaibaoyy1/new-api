@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/gin-contrib/sessions"
@@ -11,7 +12,10 @@ import (
 )
 
 type turnstileCheckResponse struct {
-	Success bool `json:"success"`
+	Success     bool     `json:"success"`
+	ErrorCodes  []string `json:"error-codes"`
+	ChallengeTs string   `json:"challenge_ts"`
+	Hostname    string   `json:"hostname"`
 }
 
 func verifyTurnstileToken(c *gin.Context) bool {
@@ -51,9 +55,15 @@ func verifyTurnstileToken(c *gin.Context) bool {
 		return false
 	}
 	if !res.Success {
+		errorMessage := "Turnstile 校验失败，请刷新重试！"
+		if len(res.ErrorCodes) > 0 {
+			errorMessage = "Turnstile 校验失败: " + strings.Join(res.ErrorCodes, ", ")
+		}
+		common.SysLog("turnstile verify failed: " + errorMessage)
 		c.JSON(http.StatusOK, gin.H{
-			"success": false,
-			"message": "Turnstile 校验失败，请刷新重试！",
+			"success":     false,
+			"message":     errorMessage,
+			"error_codes": res.ErrorCodes,
 		})
 		c.Abort()
 		return false

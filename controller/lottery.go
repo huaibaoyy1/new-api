@@ -14,6 +14,7 @@ type lotteryActivityUpsertRequest struct {
 	Enabled            bool   `json:"enabled"`
 	Days               int    `json:"days"`
 	ConsumeStatus      string `json:"consume_status"`
+	MinConsumeQuota    int    `json:"min_consume_quota"`
 	CheckinStatus      string `json:"checkin_status"`
 	Group              string `json:"group"`
 	Keyword            string `json:"keyword"`
@@ -48,6 +49,7 @@ func CreateLotteryActivity(c *gin.Context) {
 		Enabled:            req.Enabled,
 		Days:               req.Days,
 		ConsumeStatus:      req.ConsumeStatus,
+		MinConsumeQuota:    req.MinConsumeQuota,
 		CheckinStatus:      req.CheckinStatus,
 		GroupName:          req.Group,
 		Keyword:            req.Keyword,
@@ -86,6 +88,7 @@ func UpdateLotteryActivity(c *gin.Context) {
 	existing.Enabled = req.Enabled
 	existing.Days = req.Days
 	existing.ConsumeStatus = req.ConsumeStatus
+	existing.MinConsumeQuota = req.MinConsumeQuota
 	existing.CheckinStatus = req.CheckinStatus
 	existing.GroupName = req.Group
 	existing.Keyword = req.Keyword

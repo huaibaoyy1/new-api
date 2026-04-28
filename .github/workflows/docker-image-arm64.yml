@@ -158,32 +158,9 @@ jobs:
             $DOCKERHUB_REPOSITORY:latest-amd64 \
             $DOCKERHUB_REPOSITORY:latest-arm64
 
-      - name: Log in to GHCR
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create & push manifest (GHCR - version)
-        run: |
-          docker buildx imagetools create \
-            -t ghcr.io/${GHCR_REPOSITORY}:${TAG} \
-            ghcr.io/${GHCR_REPOSITORY}:${TAG}-amd64 \
-            ghcr.io/${GHCR_REPOSITORY}:${TAG}-arm64
-
-      - name: Create & push manifest (GHCR - latest)
-        run: |
-          docker buildx imagetools create \
-            -t ghcr.io/${GHCR_REPOSITORY}:latest \
-            ghcr.io/${GHCR_REPOSITORY}:latest-amd64 \
-            ghcr.io/${GHCR_REPOSITORY}:latest-arm64
-
       - name: Output manifest digest
         run: |
           echo "### Multi-arch Manifest" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           docker buildx imagetools inspect $DOCKERHUB_REPOSITORY:${TAG} >> $GITHUB_STEP_SUMMARY
-          echo "---" >> $GITHUB_STEP_SUMMARY
-          docker buildx imagetools inspect ghcr.io/${GHCR_REPOSITORY}:${TAG} >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY

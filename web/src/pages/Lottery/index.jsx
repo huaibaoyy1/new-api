@@ -32,21 +32,24 @@ import {
   Switch,
   Table,
   Tag,
-  TimePicker,
   Typography,
 } from '@douyinfe/semi-ui';
 import CardPro from '../../components/common/ui/CardPro';
 import { API, showError, showSuccess } from '../../helpers';
-import { createCardProPagination, formatDateTimeString } from '../../helpers/utils';
+import { renderQuota, getQuotaWithUnit, renderUnitWithQuota } from '../../helpers/render';
+import { formatDateTimeString } from '../../helpers/utils';
 import { useIsMobile } from '../../hooks/common/useIsMobile';
-import dayjs from 'dayjs';
 
 const toFormValues = (record = {}) => ({
   ...DEFAULT_FORM,
   ...record,
-  run_time: record?.run_time
-    ? dayjs(record.run_time, 'HH:mm').toDate()
-    : dayjs(DEFAULT_FORM.run_time, 'HH:mm').toDate(),
+  run_time: record?.run_time || DEFAULT_FORM.run_time,
+  min_consume_amount: record?.min_consume_quota
+    ? Number(getQuotaWithUnit(record.min_consume_quota))
+    : 0,
+  reward_amount: record?.reward_quota
+    ? Number(getQuotaWithUnit(record.reward_quota))
+    : Number(getQuotaWithUnit(DEFAULT_FORM.reward_quota)),
 });
 
 const DEFAULT_FORM = {
@@ -54,14 +57,53 @@ const DEFAULT_FORM = {
   enabled: true,
   days: 1,
   consume_status: 'consumed',
+  min_consume_quota: 0,
+  min_consume_amount: 0,
   checkin_status: 'all',
   group: '',
   keyword: '',
   run_time: '23:50',
   winner_count: 1,
   reward_quota: 500000,
+  reward_amount: 0,
   repeat_win_block_days: 7,
   reason: '',
+};
+
+const formatQuotaSummary = (quota) => {
+  const rawQuota = Number(quota || 0);
+  return `${renderQuota(rawQuota, 6)}（原生额度: ${rawQuota}）`;
+};
+
+const formatQuotaParts = (quota) => {
+  const rawQuota = Number(quota || 0);
+  return {
+    display: renderQuota(rawQuota, 6),
+    raw: rawQuota,
+  };
+};
+
+const consumeStatusMap = {
+  all: '全部消费',
+  consumed: '已消费',
+  not_consumed: '未消费',
+};
+
+const checkinStatusMap = {
+  all: '全部签到',
+  checked: '已签到',
+  not_checked: '未签到',
+};
+
+const mergeLiveFormValues = (prevValues, firstArg, secondArg) => {
+  const nextValues = { ...prevValues };
+  if (firstArg && typeof firstArg === 'object' && !Array.isArray(firstArg)) {
+    Object.assign(nextValues, firstArg);
+  }
+  if (secondArg && typeof secondArg === 'object' && !Array.isArray(secondArg)) {
+    Object.assign(nextValues, secondArg);
+  }
+  return nextValues;
 };
 
 const LotteryPage = () => {
@@ -73,6 +115,7 @@ const LotteryPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [editingActivity, setEditingActivity] = useState(null);
   const [formApi, setFormApi] = useState(null);
+  const [liveFormValues, setLiveFormValues] = useState(toFormValues());
 
   const [showRunsModal, setShowRunsModal] = useState(false);
   const [runsLoading, setRunsLoading] = useState(false);
@@ -117,30 +160,48 @@ const LotteryPage = () => {
 
   const openCreateModal = () => {
     setEditingActivity(null);
+    setLiveFormValues(toFormValues());
     setShowEditModal(true);
   };
 
   const openEditModal = (record) => {
     setEditingActivity(record);
+    setLiveFormValues(toFormValues(record));
     setShowEditModal(true);
   };
 
   const closeEditModal = () => {
     setShowEditModal(false);
     setEditingActivity(null);
+    setLiveFormValues(toFormValues());
     formApi?.reset();
   };
 
   const handleSubmitActivity = async (values) => {
     setSubmitting(true);
     try {
-      const payload = {
+      const mergedValues = {
+        ...liveFormValues,
         ...values,
-        run_time:
-          typeof values.run_time === 'string'
-            ? values.run_time
-            : dayjs(values.run_time).format('HH:mm'),
       };
+      const rewardQuota = Math.round(
+        renderUnitWithQuota(Number(mergedValues.reward_amount || 0)),
+      );
+      const minConsumeQuota =
+        mergedValues.consume_status === 'not_consumed'
+          ? 0
+          : Math.round(
+              renderUnitWithQuota(Number(mergedValues.min_consume_amount || 0)),
+            );
+
+      const payload = {
+        ...mergedValues,
+        run_time: String(mergedValues.run_time || '').trim(),
+        reward_quota: rewardQuota,
+        min_consume_quota: minConsumeQuota,
+      };
+      delete payload.reward_amount;
+      delete payload.min_consume_amount;
 
       let res;
       if (editingActivity?.id) {
@@ -205,7 +266,7 @@ const LotteryPage = () => {
   const handleRunNow = (record) => {
     Modal.confirm({
       title: '确认立即执行',
-      content: `将立即执行活动【${record.name}】，随机抽取 ${record.winner_count} 人，每人奖励 ${record.reward_quota} 额度。是否继续？`,
+      content: `将立即执行活动【${record.name}】，随机抽取 ${record.winner_count} 人，每人奖励 ${formatQuotaSummary(record.reward_quota)}。是否继续？`,
       okText: '立即执行',
       onOk: async () => {
         try {
@@ -325,35 +386,73 @@ const LotteryPage = () => {
       {
         title: '筛选条件',
         render: (_, record) => (
-          <Space wrap>
-            <Tag>{`最近 ${record.days} 天`}</Tag>
-            <Tag>{`消费: ${record.consume_status}`}</Tag>
-            <Tag>{`签到: ${record.checkin_status}`}</Tag>
-            {record.group ? <Tag>{`分组: ${record.group}`}</Tag> : null}
-          </Space>
-        ),
-      },
-      {
-        title: '中奖规则',
-        render: (_, record) => (
-          <div>
-            <div>{`中奖人数: ${record.winner_count}`}</div>
-            <div>{`奖励额度: ${record.reward_quota}`}</div>
-            <div>{`重复限制: ${record.repeat_win_block_days} 天`}</div>
+          <div className='flex flex-wrap gap-2'>
+            <Tag color='blue'>{`最近 ${record.days} 天`}</Tag>
+            <Tag color='grey'>
+              {consumeStatusMap[record.consume_status] || record.consume_status}
+            </Tag>
+            <Tag color='grey'>
+              {checkinStatusMap[record.checkin_status] || record.checkin_status}
+            </Tag>
+            {record.min_consume_quota > 0 ? (
+              <Tag color='orange'>
+                {`最低消费 ${formatQuotaParts(record.min_consume_quota).display}`}
+              </Tag>
+            ) : null}
+            {record.group ? <Tag color='purple'>{`分组 ${record.group}`}</Tag> : null}
           </div>
         ),
       },
       {
+        title: '中奖规则',
+        render: (_, record) => {
+          const rewardQuota = formatQuotaParts(record.reward_quota);
+          return (
+            <div className='space-y-1'>
+              <div className='text-[13px] font-medium text-gray-800 dark:text-gray-100'>
+                {`中奖人数 ${record.winner_count}`}
+              </div>
+              <div className='text-[13px] text-gray-700 dark:text-gray-200'>
+                {`奖励金额 ${rewardQuota.display}`}
+              </div>
+              <div className='text-[12px] text-gray-500 dark:text-gray-400'>
+                {`原生额度 ${rewardQuota.raw}`}
+              </div>
+              <div className='text-[12px] text-gray-500 dark:text-gray-400'>
+                {`重复限制 ${record.repeat_win_block_days} 天`}
+              </div>
+            </div>
+          );
+        },
+      },
+      {
         title: '最近执行',
-        render: (_, record) =>
-          record.last_run_at
-            ? formatDateTimeString(new Date(record.last_run_at * 1000))
-            : '-',
+        render: (_, record) => {
+          if (!record.last_run_at) {
+            return (
+              <Typography.Text type='tertiary'>
+                暂无记录
+              </Typography.Text>
+            );
+          }
+          const timeText = formatDateTimeString(new Date(record.last_run_at * 1000));
+          const [datePart, timePart] = String(timeText).split(' ');
+          return (
+            <div className='space-y-1'>
+              <div className='text-[13px] font-medium text-gray-800 dark:text-gray-100'>
+                {datePart}
+              </div>
+              <div className='text-[12px] text-gray-500 dark:text-gray-400'>
+                {timePart || ''}
+              </div>
+            </div>
+          );
+        },
       },
       {
         title: '操作',
         render: (_, record) => (
-          <Space wrap>
+          <div className='flex flex-wrap items-center gap-2'>
             <Switch
               checked={record.enabled}
               onChange={(checked) => handleToggle(record, checked)}
@@ -371,10 +470,10 @@ const LotteryPage = () => {
             <Button size='small' onClick={() => openWinnersModal(record)}>
               中奖名单
             </Button>
-            <Button size='small' type='danger' onClick={() => handleDelete(record)}>
+            <Button size='small' type='danger' theme='borderless' onClick={() => handleDelete(record)}>
               删除
             </Button>
-          </Space>
+          </div>
         ),
       },
     ],
@@ -478,20 +577,29 @@ const LotteryPage = () => {
           key={editingActivity?.id || 'create'}
           initValues={toFormValues(editingActivity || {})}
           getFormApi={(api) => setFormApi(api)}
+          onValueChange={(firstArg, secondArg) =>
+            setLiveFormValues((prev) =>
+              mergeLiveFormValues(prev, firstArg, secondArg),
+            )
+          }
           onSubmit={handleSubmitActivity}
         >
           <Form.Input field='name' label='活动名称' required />
           <Form.Switch field='enabled' label='启用状态' />
           <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
             <Form.InputNumber field='days' label='最近几天' min={1} required />
-            <Form.TimePicker
+            <Form.Input
               field='run_time'
               label='每天执行时间'
-              format='HH:mm'
-              type='time'
-              transform={(value) =>
-                value ? dayjs(value).format('HH:mm') : '23:50'
-              }
+              placeholder='23:50'
+              extraText='请按 HH:mm 格式填写，例如 23:50'
+              rules={[
+                {
+                  pattern: /^([01]\d|2[0-3]):([0-5]\d)$/,
+                  message: '执行时间格式无效，必须为 HH:mm',
+                },
+              ]}
+              required
             />
             <Form.Select
               field='consume_status'
@@ -511,6 +619,16 @@ const LotteryPage = () => {
                 { label: '未签到', value: 'not_checked' },
               ]}
             />
+            <Form.InputNumber
+              field='min_consume_amount'
+              label='最低消费金额（0 表示不限制）'
+              min={0}
+              step={0.01}
+              extraText={`当前原生额度：${Number(
+                renderUnitWithQuota(Number(liveFormValues?.min_consume_amount || 0)),
+              ) || 0}`}
+              disabled={liveFormValues?.consume_status === 'not_consumed'}
+            />
             <Form.Input field='group' label='分组（可选）' />
             <Form.Input field='keyword' label='关键词（可选）' />
             <Form.InputNumber
@@ -520,9 +638,13 @@ const LotteryPage = () => {
               required
             />
             <Form.InputNumber
-              field='reward_quota'
-              label='每人奖励额度'
-              min={1}
+              field='reward_amount'
+              label='每人奖励金额'
+              min={0.01}
+              step={0.01}
+              extraText={`当前原生额度：${Number(
+                renderUnitWithQuota(Number(liveFormValues?.reward_amount || 0)),
+              ) || 0}`}
               required
             />
             <Form.InputNumber

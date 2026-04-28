@@ -28,6 +28,7 @@ type LotteryActivity struct {
 	Enabled            bool           `json:"enabled" gorm:"default:false;index"`
 	Days               int            `json:"days" gorm:"default:1"`
 	ConsumeStatus      string         `json:"consume_status" gorm:"type:varchar(32);default:'consumed'"`
+	MinConsumeQuota    int            `json:"min_consume_quota" gorm:"default:0"`
 	CheckinStatus      string         `json:"checkin_status" gorm:"type:varchar(32);default:'all'"`
 	GroupName          string         `json:"group" gorm:"column:group_name;type:varchar(64);default:'';index"`
 	Keyword            string         `json:"keyword" gorm:"type:varchar(255);default:''"`
@@ -176,6 +177,7 @@ func (activity *LotteryActivity) Update() error {
 		"enabled":               activity.Enabled,
 		"days":                  activity.Days,
 		"consume_status":        activity.ConsumeStatus,
+		"min_consume_quota":     activity.MinConsumeQuota,
 		"checkin_status":        activity.CheckinStatus,
 		"group_name":            activity.GroupName,
 		"keyword":               activity.Keyword,
@@ -266,8 +268,8 @@ func getLotteryBlockedUserSet(tx *gorm.DB, activityId int, repeatWinBlockDays in
 	return result, nil
 }
 
-func filterLotteryCandidates(activity *LotteryActivity, users []*User, blockedUserSet map[int]struct{}) []*User {
-	candidates := make([]*User, 0, len(users))
+func filterLotteryCandidates(activity *LotteryActivity, users []*UserActivityRow, blockedUserSet map[int]struct{}) []*UserActivityRow {
+	candidates := make([]*UserActivityRow, 0, len(users))
 	for _, user := range users {
 		if user == nil {
 			continue
@@ -281,6 +283,9 @@ func filterLotteryCandidates(activity *LotteryActivity, users []*User, blockedUs
 		if activity.ConsumeStatus == "consumed" && user.ConsumeCount <= 0 {
 			continue
 		}
+		if activity.MinConsumeQuota > 0 && user.TotalConsumeQuota < int64(activity.MinConsumeQuota) {
+			continue
+		}
 		if _, blocked := blockedUserSet[user.Id]; blocked {
 			continue
 		}
@@ -289,11 +294,11 @@ func filterLotteryCandidates(activity *LotteryActivity, users []*User, blockedUs
 	return candidates
 }
 
-func drawLotteryWinners(candidates []*User, winnerCount int) []*User {
+func drawLotteryWinners(candidates []*UserActivityRow, winnerCount int) []*UserActivityRow {
 	if len(candidates) == 0 || winnerCount <= 0 {
-		return []*User{}
+		return []*UserActivityRow{}
 	}
-	shuffled := make([]*User, len(candidates))
+	shuffled := make([]*UserActivityRow, len(candidates))
 	copy(shuffled, candidates)
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	r.Shuffle(len(shuffled), func(i, j int) {

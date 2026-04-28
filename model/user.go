@@ -49,14 +49,9 @@ type User struct {
 	Setting          string         `json:"setting" gorm:"type:text;column:setting"`
 	Remark           string         `json:"remark,omitempty" gorm:"type:varchar(255)" validate:"max=255"`
 	StripeCustomer   string         `json:"stripe_customer" gorm:"type:varchar(64);column:stripe_customer;index"`
-	CreatedAt        int64          `json:"created_at" gorm:"autoCreateTime;column:created_at"`
-	LastLoginAt      int64          `json:"last_login_at" gorm:"default:0;column:last_login_at"`
-	LastLoginIP      string         `json:"last_login_ip" gorm:"type:varchar(64);default:'';column:last_login_ip"`
-	TotalTokens      int64          `json:"total_tokens" gorm:"-"`
-	TotalConsumeQuota int64         `json:"total_consume_quota" gorm:"-"`
-	ConsumeCount     int64          `json:"consume_count" gorm:"-"`
-	CheckinCount     int64          `json:"checkin_count" gorm:"-"`
-	CheckedIn        bool           `json:"checked_in" gorm:"-"`
+	CreatedAt      int64          `json:"created_at" gorm:"autoCreateTime;column:created_at"`
+	LastLoginAt    int64          `json:"last_login_at" gorm:"default:0;column:last_login_at"`
+	LastLoginIP    string         `json:"last_login_ip" gorm:"type:varchar(64);default:'';column:last_login_ip"`
 }
 
 func (user *User) ToBaseUser() *UserBase {
@@ -195,12 +190,12 @@ func GetMaxUserId() int {
 	return user.Id
 }
 
-func GetAllUsers(pageInfo *common.PageInfo) (users []*User, total int64, err error) {
+func GetAllUsers(pageInfo *common.PageInfo) (users []*UserActivityRow, total int64, err error) {
 	filter := UserActivityFilter{}
 	return GetAllUsersWithActivity(pageInfo, "", "", filter)
 }
 
-func GetAllUsersWithActivity(pageInfo *common.PageInfo, keyword string, group string, filter UserActivityFilter) (users []*User, total int64, err error) {
+func GetAllUsersWithActivity(pageInfo *common.PageInfo, keyword string, group string, filter UserActivityFilter) (users []*UserActivityRow, total int64, err error) {
 	tx := DB.Begin()
 	if tx.Error != nil {
 		return nil, 0, tx.Error
@@ -211,15 +206,15 @@ func GetAllUsersWithActivity(pageInfo *common.PageInfo, keyword string, group st
 		}
 	}()
 
-	query := buildUserActivityQuery(tx, keyword, group, filter)
-
-	err = query.Count(&total).Error
+	countQuery := buildUserActivityQuery(tx, keyword, group, filter)
+	err = countQuery.Count(&total).Error
 	if err != nil {
 		tx.Rollback()
 		return nil, 0, err
 	}
 
-	err = query.Order("users.id desc").Limit(pageInfo.GetPageSize()).Offset(pageInfo.GetStartIdx()).Omit("password").Find(&users).Error
+	listQuery := buildUserActivityQuery(tx, keyword, group, filter)
+	err = listQuery.Order("users.id desc").Limit(pageInfo.GetPageSize()).Offset(pageInfo.GetStartIdx()).Omit("password").Find(&users).Error
 	if err != nil {
 		tx.Rollback()
 		return nil, 0, err
@@ -234,12 +229,12 @@ func GetAllUsersWithActivity(pageInfo *common.PageInfo, keyword string, group st
 	return users, total, nil
 }
 
-func SearchUsers(keyword string, group string, startIdx int, num int) ([]*User, int64, error) {
+func SearchUsers(keyword string, group string, startIdx int, num int) ([]*UserActivityRow, int64, error) {
 	filter := UserActivityFilter{}
 	return SearchUsersWithActivity(keyword, group, startIdx, num, filter)
 }
 
-func SearchUsersWithActivity(keyword string, group string, startIdx int, num int, filter UserActivityFilter) ([]*User, int64, error) {
+func SearchUsersWithActivity(keyword string, group string, startIdx int, num int, filter UserActivityFilter) ([]*UserActivityRow, int64, error) {
 	pageInfo := &common.PageInfo{
 		Page:     startIdx/num + 1,
 		PageSize: num,

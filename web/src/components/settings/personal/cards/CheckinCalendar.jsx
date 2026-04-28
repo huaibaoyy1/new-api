@@ -120,12 +120,16 @@ const CheckinCalendar = ({ t, status, turnstileEnabled, turnstileSiteKey }) => {
     return API.post(url);
   };
 
+  const resetTurnstileWidget = () => {
+    setTurnstileWidgetKey((v) => v + 1);
+  };
+
   const openTurnstileCheckinModal = () => {
     if (!turnstileSiteKey) {
       showError('Turnstile is enabled but site key is empty.');
       return;
     }
-    setTurnstileWidgetKey((v) => v + 1);
+    resetTurnstileWidget();
     setTurnstileModalVisible(true);
   };
 
@@ -161,7 +165,8 @@ const CheckinCalendar = ({ t, status, turnstileEnabled, turnstileSiteKey }) => {
           return;
         }
         if (token && shouldTriggerTurnstile(message)) {
-          setTurnstileWidgetKey((v) => v + 1);
+          resetTurnstileWidget();
+          setTurnstileModalVisible(true);
         }
         showError(message || t('签到失败'));
       }
@@ -234,7 +239,7 @@ const CheckinCalendar = ({ t, status, turnstileEnabled, turnstileSiteKey }) => {
         centered
         onCancel={() => {
           setTurnstileModalVisible(false);
-          setTurnstileWidgetKey((v) => v + 1);
+          resetTurnstileWidget();
         }}
       >
         <div className='flex justify-center py-2'>
@@ -245,7 +250,16 @@ const CheckinCalendar = ({ t, status, turnstileEnabled, turnstileSiteKey }) => {
               doCheckin(token);
             }}
             onExpire={() => {
-              setTurnstileWidgetKey((v) => v + 1);
+              showError(t('Turnstile 验证已过期，请重试'));
+              resetTurnstileWidget();
+            }}
+            onError={() => {
+              showError(t('Turnstile 验证失败，请重试'));
+              resetTurnstileWidget();
+            }}
+            onTimeout={() => {
+              showError(t('Turnstile 验证超时，请重试'));
+              resetTurnstileWidget();
             }}
           />
         </div>
