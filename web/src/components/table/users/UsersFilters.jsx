@@ -60,90 +60,152 @@ const UsersFilters = ({
       stopValidateWithError={false}
       className='w-full md:w-auto order-1 md:order-2'
     >
-      <div className='flex flex-col md:flex-row items-center gap-2 w-full md:w-auto'>
-        <div className='relative w-full md:w-64'>
-          <Form.Input
-            field='searchKeyword'
-            prefix={<IconSearch />}
-            placeholder={t('支持搜索用户的 ID、用户名、显示名称和邮箱地址')}
-            showClear
-            pure
-            size='small'
-          />
+      <div className='flex w-full flex-col gap-2'>
+        <div className='flex flex-wrap items-end gap-2'>
+          <div className='min-w-[280px] flex-1'>
+            <div className='mb-1 text-xs text-[var(--semi-color-text-2)]'>{t('关键词')}</div>
+            <Form.Input
+              field='searchKeyword'
+              prefix={<IconSearch />}
+              placeholder={t('搜索 ID / 用户名 / 显示名称 / 邮箱')}
+              showClear
+              pure
+              size='small'
+            />
+          </div>
+          <div className='w-[88px]'>
+            <div className='mb-1 text-xs text-[var(--semi-color-text-2)]'>{t('统计天数')}</div>
+            <Form.InputNumber
+              field='activityDays'
+              placeholder={t('天数')}
+              min={1}
+              max={3650}
+              pure
+              size='small'
+            />
+          </div>
+          <div className='w-[150px]'>
+            <div className='mb-1 text-xs text-[var(--semi-color-text-2)]'>{t('分组')}</div>
+            <Form.Select
+              field='searchGroup'
+              placeholder={t('选择分组')}
+              optionList={groupOptions}
+              onChange={() => {
+                setTimeout(() => {
+                  searchUsers(1, pageSize);
+                }, 100);
+              }}
+              className='w-full'
+              showClear
+              pure
+              size='small'
+            />
+          </div>
+          <div className='w-[140px]'>
+            <div className='mb-1 text-xs text-[var(--semi-color-text-2)]'>{t('消费状态')}</div>
+            <Form.Select
+              field='consumeStatus'
+              placeholder={t('消费状态')}
+              optionList={[
+                { label: t('全部消费'), value: 'all' },
+                { label: t('有消费'), value: 'consumed' },
+                { label: t('无消费'), value: 'not_consumed' },
+              ]}
+              className='w-full'
+              pure
+              size='small'
+            />
+          </div>
+          <div className='w-[140px]'>
+            <div className='mb-1 text-xs text-[var(--semi-color-text-2)]'>{t('签到状态')}</div>
+            <Form.Select
+              field='checkinStatus'
+              placeholder={t('签到状态')}
+              optionList={[
+                { label: t('全部签到'), value: 'all' },
+                { label: t('已签到'), value: 'checked' },
+                { label: t('未签到'), value: 'not_checked' },
+              ]}
+              className='w-full'
+              pure
+              size='small'
+            />
+          </div>
+          <div className='flex gap-2'>
+            <Button
+              type='tertiary'
+              htmlType='submit'
+              loading={loading || searching}
+              size='small'
+            >
+              {t('查询')}
+            </Button>
+            <Button
+              type='tertiary'
+              onClick={handleReset}
+              size='small'
+            >
+              {t('重置')}
+            </Button>
+          </div>
         </div>
-        <div className='w-full md:w-32'>
-          <Form.InputNumber
-            field='activityDays'
-            placeholder={t('天数')}
-            min={1}
-            max={3650}
-            pure
-            size='small'
-          />
-        </div>
-        <div className='w-full md:w-40'>
-          <Form.Select
-            field='consumeStatus'
-            placeholder={t('消费状态')}
-            optionList={[
-              { label: t('全部消费'), value: 'all' },
-              { label: t('有消费'), value: 'consumed' },
-              { label: t('无消费'), value: 'not_consumed' },
-            ]}
-            className='w-full'
-            pure
-            size='small'
-          />
-        </div>
-        <div className='w-full md:w-40'>
-          <Form.Select
-            field='checkinStatus'
-            placeholder={t('签到状态')}
-            optionList={[
-              { label: t('全部签到'), value: 'all' },
-              { label: t('已签到'), value: 'checked' },
-              { label: t('未签到'), value: 'not_checked' },
-            ]}
-            className='w-full'
-            pure
-            size='small'
-          />
-        </div>
-        <div className='w-full md:w-48'>
-          <Form.Select
-            field='searchGroup'
-            placeholder={t('选择分组')}
-            optionList={groupOptions}
-            onChange={(value) => {
-              // Group change triggers automatic search
-              setTimeout(() => {
-                searchUsers(1, pageSize);
-              }, 100);
-            }}
-            className='w-full'
-            showClear
-            pure
-            size='small'
-          />
-        </div>
-        <div className='flex gap-2 w-full md:w-auto'>
-          <Button
-            type='tertiary'
-            htmlType='submit'
-            loading={loading || searching}
-            className='flex-1 md:flex-initial md:w-auto'
-            size='small'
-          >
-            {t('查询')}
-          </Button>
-          <Button
-            type='tertiary'
-            onClick={handleReset}
-            className='flex-1 md:flex-initial md:w-auto'
-            size='small'
-          >
-            {t('重置')}
-          </Button>
+
+        <div className='flex flex-wrap items-end gap-2 rounded-lg bg-[var(--semi-color-fill-0)] px-3 py-2'>
+          <div className='mr-2 text-xs text-[var(--semi-color-text-2)]'>
+            {t('高级筛选')}
+          </div>
+          <div className='w-[140px]'>
+            <div className='mb-1 text-xs text-[var(--semi-color-text-2)]'>{t('用户状态')}</div>
+            <Form.Select
+              field='userStatus'
+              placeholder={t('用户状态')}
+              optionList={[
+                { label: t('全部状态'), value: 0 },
+                { label: t('已启用'), value: 1 },
+                { label: t('已禁用'), value: 2 },
+              ]}
+              className='w-full'
+              pure
+              size='small'
+            />
+          </div>
+          <div className='w-[140px]'>
+            <div className='mb-1 text-xs text-[var(--semi-color-text-2)]'>{t('请求风险')}</div>
+            <Form.Select
+              field='riskLevel'
+              placeholder={t('请求风险')}
+              optionList={[
+                { label: t('全部风险'), value: 'all' },
+                { label: t('低风险'), value: 'low' },
+                { label: t('中风险'), value: 'medium' },
+                { label: t('高风险'), value: 'high' },
+              ]}
+              className='w-full'
+              pure
+              size='small'
+            />
+          </div>
+          <div className='w-[120px]'>
+            <div className='mb-1 text-xs text-[var(--semi-color-text-2)]'>{t('最小错误率')}</div>
+            <Form.InputNumber
+              field='minErrorRate'
+              placeholder={t('支持 0.2')}
+              min={0}
+              max={100}
+              pure
+              size='small'
+            />
+          </div>
+          <div className='w-[120px]'>
+            <div className='mb-1 text-xs text-[var(--semi-color-text-2)]'>{t('最少429次数')}</div>
+            <Form.InputNumber
+              field='minStatus429'
+              placeholder={t('例如 5')}
+              min={0}
+              pure
+              size='small'
+            />
+          </div>
         </div>
       </div>
     </Form>

@@ -296,10 +296,18 @@ func SearchUsers(c *gin.Context) {
 }
 
 func modelUserActivityFilterFromRequest(c *gin.Context, days int) model.UserActivityFilter {
+	userStatus, _ := strconv.Atoi(c.DefaultQuery("user_status", "0"))
+	minErrorRate, _ := strconv.ParseFloat(c.DefaultQuery("min_error_rate", "0"), 64)
+	minStatus429, _ := strconv.Atoi(c.DefaultQuery("min_status_429", "0"))
+
 	return model.UserActivityFilter{
 		Days:          days,
 		ConsumeStatus: c.DefaultQuery("consume_status", "all"),
 		CheckinStatus: c.DefaultQuery("checkin_status", "all"),
+		UserStatus:    userStatus,
+		RiskLevel:     c.DefaultQuery("risk_level", "all"),
+		MinErrorRate:  minErrorRate,
+		MinStatus429:  minStatus429,
 	}
 }
 

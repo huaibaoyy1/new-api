@@ -206,6 +206,26 @@ func GetAllUsersWithActivity(pageInfo *common.PageInfo, keyword string, group st
 		}
 	}()
 
+	if needsUserActivityRiskFilter(filter) {
+		var allUsers []*UserActivityRow
+		listQuery := buildUserActivityQuery(tx, keyword, group, filter)
+		err = listQuery.Order("users.id desc").Omit("password").Find(&allUsers).Error
+		if err != nil {
+			tx.Rollback()
+			return nil, 0, err
+		}
+
+		fillUserActivityFields(allUsers, filter.Days)
+		allUsers = filterUserActivityRows(allUsers, filter)
+		total = int64(len(allUsers))
+		users = paginateUserActivityRows(allUsers, pageInfo.GetStartIdx(), pageInfo.GetPageSize())
+
+		if err = tx.Commit().Error; err != nil {
+			return nil, 0, err
+		}
+		return users, total, nil
+	}
+
 	countQuery := buildUserActivityQuery(tx, keyword, group, filter)
 	err = countQuery.Count(&total).Error
 	if err != nil {

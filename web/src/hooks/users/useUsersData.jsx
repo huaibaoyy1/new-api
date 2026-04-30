@@ -40,6 +40,10 @@ export const useUsersData = () => {
     days: 1,
     consumeStatus: 'all',
     checkinStatus: 'all',
+    userStatus: 0,
+    riskLevel: 'all',
+    minErrorRate: 0,
+    minStatus429: 0,
   });
   const [activitySummary, setActivitySummary] = useState({
     total_users: 0,
@@ -73,6 +77,10 @@ export const useUsersData = () => {
     activityDays: 1,
     consumeStatus: 'all',
     checkinStatus: 'all',
+    userStatus: 0,
+    riskLevel: 'all',
+    minErrorRate: 0,
+    minStatus429: 0,
   };
 
   // Form API reference
@@ -87,6 +95,10 @@ export const useUsersData = () => {
       activityDays: Number(formValues.activityDays || 1),
       consumeStatus: formValues.consumeStatus || 'all',
       checkinStatus: formValues.checkinStatus || 'all',
+      userStatus: Number(formValues.userStatus || 0),
+      riskLevel: formValues.riskLevel || 'all',
+      minErrorRate: Number(formValues.minErrorRate || 0),
+      minStatus429: Number(formValues.minStatus429 || 0),
     };
   };
 
@@ -97,7 +109,7 @@ export const useUsersData = () => {
   ) => {
     try {
       const res = await API.get(
-        `/api/user/activity_summary?keyword=${searchKeyword}&group=${searchGroup}&days=${filters.days}&consume_status=${filters.consumeStatus}&checkin_status=${filters.checkinStatus}`,
+        `/api/user/activity_summary?keyword=${searchKeyword}&group=${searchGroup}&days=${filters.days}&consume_status=${filters.consumeStatus}&checkin_status=${filters.checkinStatus}&user_status=${filters.userStatus || 0}&risk_level=${filters.riskLevel || 'all'}&min_error_rate=${filters.minErrorRate || 0}&min_status_429=${filters.minStatus429 || 0}`,
       );
       const { success, message, data } = res.data;
       if (success) {
@@ -132,7 +144,7 @@ export const useUsersData = () => {
     const filters = nextFilters || activityFilters;
     setActivityFilters(filters);
     const res = await API.get(
-      `/api/user/?p=${startIdx}&page_size=${pageSize}&days=${filters.days}&consume_status=${filters.consumeStatus}&checkin_status=${filters.checkinStatus}`,
+      `/api/user/?p=${startIdx}&page_size=${pageSize}&days=${filters.days}&consume_status=${filters.consumeStatus}&checkin_status=${filters.checkinStatus}&user_status=${filters.userStatus || 0}&risk_level=${filters.riskLevel || 'all'}&min_error_rate=${filters.minErrorRate || 0}&min_status_429=${filters.minStatus429 || 0}`,
     );
     const { success, message, data } = res.data;
     if (success) {
@@ -165,6 +177,10 @@ export const useUsersData = () => {
         days: formValues.activityDays,
         consumeStatus: formValues.consumeStatus,
         checkinStatus: formValues.checkinStatus,
+        userStatus: formValues.userStatus,
+        riskLevel: formValues.riskLevel,
+        minErrorRate: formValues.minErrorRate,
+        minStatus429: formValues.minStatus429,
       };
     }
 
@@ -176,7 +192,7 @@ export const useUsersData = () => {
     }
     setSearching(true);
     const res = await API.get(
-      `/api/user/search?keyword=${searchKeyword}&group=${searchGroup}&p=${startIdx}&page_size=${pageSize}&days=${filters.days}&consume_status=${filters.consumeStatus}&checkin_status=${filters.checkinStatus}`,
+      `/api/user/search?keyword=${searchKeyword}&group=${searchGroup}&p=${startIdx}&page_size=${pageSize}&days=${filters.days}&consume_status=${filters.consumeStatus}&checkin_status=${filters.checkinStatus}&user_status=${filters.userStatus || 0}&risk_level=${filters.riskLevel || 'all'}&min_error_rate=${filters.minErrorRate || 0}&min_status_429=${filters.minStatus429 || 0}`,
     );
     const { success, message, data } = res.data;
     if (success) {
@@ -268,11 +284,19 @@ export const useUsersData = () => {
       activityDays,
       consumeStatus,
       checkinStatus,
+      userStatus,
+      riskLevel,
+      minErrorRate,
+      minStatus429,
     } = getFormValues();
     const filters = {
       days: activityDays,
       consumeStatus,
       checkinStatus,
+      userStatus,
+      riskLevel,
+      minErrorRate,
+      minStatus429,
     };
     if (searchKeyword === '' && searchGroup === '') {
       loadUsers(page, pageSize, filters).then();
@@ -342,6 +366,10 @@ export const useUsersData = () => {
       activityDays,
       consumeStatus,
       checkinStatus,
+      userStatus,
+      riskLevel,
+      minErrorRate,
+      minStatus429,
     } = getFormValues();
     try {
       const res = await API.get('/api/user/activity_export', {
@@ -351,6 +379,10 @@ export const useUsersData = () => {
           days: String(activityDays || 1),
           consume_status: consumeStatus || 'all',
           checkin_status: checkinStatus || 'all',
+          user_status: String(userStatus || 0),
+          risk_level: riskLevel || 'all',
+          min_error_rate: String(minErrorRate || 0),
+          min_status_429: String(minStatus429 || 0),
         },
         responseType: 'blob',
       });
@@ -444,11 +476,19 @@ export const useUsersData = () => {
       activityDays,
       consumeStatus,
       checkinStatus,
+      userStatus,
+      riskLevel,
+      minErrorRate,
+      minStatus429,
     } = getFormValues();
     const filters = {
       days: activityDays,
       consumeStatus,
       checkinStatus,
+      userStatus,
+      riskLevel,
+      minErrorRate,
+      minStatus429,
     };
     if (searchKeyword === '' && searchGroup === '') {
       await loadUsers(page, pageSize, filters);

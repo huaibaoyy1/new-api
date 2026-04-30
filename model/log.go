@@ -734,21 +734,34 @@ func GetUserRiskLogs(userId int, days int, startIdx int, num int) ([]*UserRiskLo
 	if days <= 0 {
 		days = 7
 	}
+	if startIdx < 0 {
+		startIdx = 0
+	}
+	if num <= 0 {
+		num = common.MaxRecentItems
+	}
+
 	startTimestamp := time.Now().AddDate(0, 0, -days).Unix()
+	baseQuery := LOG_DB.Where("user_id = ? AND created_at >= ? AND type = ?", userId, startTimestamp, LogTypeError)
+
+	var total int64
+	if err := baseQuery.Model(&Log{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	if total == 0 || int64(startIdx) >= total {
+		return []*UserRiskLogItem{}, total, nil
+	}
+
 	var logs []*Log
-	err := LOG_DB.Where("user_id = ? AND created_at >= ? AND type = ?", userId, startTimestamp, LogTypeError).
-		Order("id desc").
-		Find(&logs).Error
+	err := baseQuery.Order("id desc").Limit(num).Offset(startIdx).Find(&logs).Error
 	if err != nil {
 		return nil, 0, err
 	}
+
 	items := make([]*UserRiskLogItem, 0, len(logs))
 	channelIds := types.NewSet[int]()
 	for _, log := range logs {
 		statusCode := parseRiskStatusCode(log)
-		if statusCode >= 200 && statusCode < 300 {
-			continue
-		}
 		otherMap := parseRiskOtherMap(log)
 		item := &UserRiskLogItem{
 			Id:         log.Id,
@@ -792,6 +805,7 @@ func GetUserRiskLogs(userId int, days int, startIdx int, num int) ([]*UserRiskLo
 		}
 		items = append(items, item)
 	}
+
 	if channelIds.Len() > 0 {
 		var channels []struct {
 			Id   int    `gorm:"column:id"`
@@ -808,18 +822,11 @@ func GetUserRiskLogs(userId int, days int, startIdx int, num int) ([]*UserRiskLo
 			item.ChannelName = channelMap[item.ChannelId]
 		}
 	}
+
 	sort.Slice(items, func(i, j int) bool {
 		return items[i].Id > items[j].Id
 	})
-	total := int64(len(items))
-	if startIdx >= len(items) {
-		return []*UserRiskLogItem{}, total, nil
-	}
-	endIdx := startIdx + num
-	if endIdx > len(items) {
-		endIdx = len(items)
-	}
-	return items[startIdx:endIdx], total, nil
+	return items, total, nil
 }
 
 func DeleteOldLog(ctx context.Context, targetTimestamp int64, limit int) (int64, error) {

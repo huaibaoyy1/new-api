@@ -2,6 +2,7 @@ package model
 
 import (
 	"strconv"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -11,6 +12,10 @@ type UserActivityFilter struct {
 	Days          int
 	ConsumeStatus string
 	CheckinStatus string
+	UserStatus    int
+	RiskLevel     string
+	MinErrorRate  float64
+	MinStatus429  int
 }
 
 type UserActivityRow struct {
@@ -120,7 +125,56 @@ COALESCE(checkin_stats.checkin_count, 0) AS checkin_count`).
 		query = query.Where("COALESCE(checkin_stats.checkin_count, 0) = 0")
 	}
 
+	if filter.UserStatus != 0 {
+		query = query.Where("users.status = ?", filter.UserStatus)
+	}
+
 	return query
+}
+
+func needsUserActivityRiskFilter(filter UserActivityFilter) bool {
+	return (filter.RiskLevel != "" && filter.RiskLevel != "all") || filter.MinErrorRate > 0 || filter.MinStatus429 > 0
+}
+
+func filterUserActivityRows(users []*UserActivityRow, filter UserActivityFilter) []*UserActivityRow {
+	if len(users) == 0 {
+		return users
+	}
+	riskLevel := strings.ToLower(strings.TrimSpace(filter.RiskLevel))
+	filtered := make([]*UserActivityRow, 0, len(users))
+	for _, user := range users {
+		if user == nil {
+			continue
+		}
+		if riskLevel != "" && riskLevel != "all" && strings.ToLower(user.RiskLevel) != riskLevel {
+			continue
+		}
+		if filter.MinErrorRate > 0 && user.ErrorRate < filter.MinErrorRate {
+			continue
+		}
+		if filter.MinStatus429 > 0 && user.Status429 < filter.MinStatus429 {
+			continue
+		}
+		filtered = append(filtered, user)
+	}
+	return filtered
+}
+
+func paginateUserActivityRows(users []*UserActivityRow, startIdx int, pageSize int) []*UserActivityRow {
+	if startIdx < 0 {
+		startIdx = 0
+	}
+	if pageSize <= 0 {
+		return users
+	}
+	if startIdx >= len(users) {
+		return []*UserActivityRow{}
+	}
+	endIdx := startIdx + pageSize
+	if endIdx > len(users) {
+		endIdx = len(users)
+	}
+	return users[startIdx:endIdx]
 }
 
 func fillUserActivityFields(users []*UserActivityRow, days int) {
@@ -167,6 +221,7 @@ func GetAllUsersActivity(keyword string, group string, filter UserActivityFilter
 	}
 
 	fillUserActivityFields(users, filter.Days)
+	users = filterUserActivityRows(users, filter)
 
 	if err := tx.Commit().Error; err != nil {
 		return nil, err
@@ -175,50 +230,28 @@ func GetAllUsersActivity(keyword string, group string, filter UserActivityFilter
 }
 
 func GetUserActivitySummary(keyword string, group string, filter UserActivityFilter) (*UserActivitySummary, error) {
-	tx := DB.Begin()
-	if tx.Error != nil {
-		return nil, tx.Error
+	users, err := GetAllUsersActivity(keyword, group, filter)
+	if err != nil {
+		return nil, err
 	}
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
+
+	summary := &UserActivitySummary{
+		TotalUsers: int64(len(users)),
+	}
+	for _, user := range users {
+		if user == nil {
+			continue
 		}
-	}()
-
-	baseFilter := filter
-	baseFilter.ConsumeStatus = "all"
-	baseFilter.CheckinStatus = "all"
-
-	baseQuery := buildUserActivityQuery(tx, keyword, group, baseFilter)
-	summary := &UserActivitySummary{}
-
-	if err := baseQuery.Count(&summary.TotalUsers).Error; err != nil {
-		tx.Rollback()
-		return nil, err
-	}
-
-	if err := buildUserActivityQuery(tx, keyword, group, UserActivityFilter{
-		Days:          filter.Days,
-		ConsumeStatus: "consumed",
-		CheckinStatus: "all",
-	}).Count(&summary.ConsumedUsers).Error; err != nil {
-		tx.Rollback()
-		return nil, err
-	}
-	summary.NotConsumedUsers = summary.TotalUsers - summary.ConsumedUsers
-
-	if err := buildUserActivityQuery(tx, keyword, group, UserActivityFilter{
-		Days:          filter.Days,
-		ConsumeStatus: "all",
-		CheckinStatus: "checked",
-	}).Count(&summary.CheckedUsers).Error; err != nil {
-		tx.Rollback()
-		return nil, err
-	}
-	summary.NotCheckedUsers = summary.TotalUsers - summary.CheckedUsers
-
-	if err := tx.Commit().Error; err != nil {
-		return nil, err
+		if user.ConsumeCount > 0 {
+			summary.ConsumedUsers++
+		} else {
+			summary.NotConsumedUsers++
+		}
+		if user.CheckedIn {
+			summary.CheckedUsers++
+		} else {
+			summary.NotCheckedUsers++
+		}
 	}
 
 	return summary, nil
