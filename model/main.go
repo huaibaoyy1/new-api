@@ -297,6 +297,9 @@ func migrateDB() error {
 			return err
 		}
 	}
+	if err := ensureLogIndexes(DB); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -369,6 +372,9 @@ func migrateDBFast() error {
 			return err
 		}
 	}
+	if err := ensureLogIndexes(DB); err != nil {
+		return err
+	}
 	common.SysLog("database migrated")
 	return nil
 }
@@ -378,7 +384,20 @@ func migrateLOGDB() error {
 	if err = LOG_DB.AutoMigrate(&Log{}); err != nil {
 		return err
 	}
+	if err = ensureLogIndexes(LOG_DB); err != nil {
+		return err
+	}
 	return nil
+}
+
+func ensureLogIndexes(db *gorm.DB) error {
+	if db == nil {
+		return nil
+	}
+	if db.Migrator().HasIndex(&Log{}, "idx_logs_type_created_at_id") {
+		return nil
+	}
+	return db.Migrator().CreateIndex(&Log{}, "idx_logs_type_created_at_id")
 }
 
 type sqliteColumnDef struct {

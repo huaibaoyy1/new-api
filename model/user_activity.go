@@ -230,28 +230,80 @@ func GetAllUsersActivity(keyword string, group string, filter UserActivityFilter
 }
 
 func GetUserActivitySummary(keyword string, group string, filter UserActivityFilter) (*UserActivitySummary, error) {
-	users, err := GetAllUsersActivity(keyword, group, filter)
-	if err != nil {
+	if needsUserActivityRiskFilter(filter) {
+		users, err := GetAllUsersActivity(keyword, group, filter)
+		if err != nil {
+			return nil, err
+		}
+
+		summary := &UserActivitySummary{
+			TotalUsers: int64(len(users)),
+		}
+		for _, user := range users {
+			if user == nil {
+				continue
+			}
+			if user.ConsumeCount > 0 {
+				summary.ConsumedUsers++
+			} else {
+				summary.NotConsumedUsers++
+			}
+			if user.CheckedIn {
+				summary.CheckedUsers++
+			} else {
+				summary.NotCheckedUsers++
+			}
+		}
+
+		return summary, nil
+	}
+
+	tx := DB.Begin()
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	baseFilter := filter
+	baseFilter.ConsumeStatus = "all"
+	baseFilter.CheckinStatus = "all"
+
+	baseQuery := buildUserActivityQuery(tx, keyword, group, baseFilter)
+	summary := &UserActivitySummary{}
+
+	if err := baseQuery.Count(&summary.TotalUsers).Error; err != nil {
+		tx.Rollback()
 		return nil, err
 	}
 
-	summary := &UserActivitySummary{
-		TotalUsers: int64(len(users)),
+	if err := buildUserActivityQuery(tx, keyword, group, UserActivityFilter{
+		Days:          filter.Days,
+		ConsumeStatus: "consumed",
+		CheckinStatus: "all",
+		UserStatus:    filter.UserStatus,
+	}).Count(&summary.ConsumedUsers).Error; err != nil {
+		tx.Rollback()
+		return nil, err
 	}
-	for _, user := range users {
-		if user == nil {
-			continue
-		}
-		if user.ConsumeCount > 0 {
-			summary.ConsumedUsers++
-		} else {
-			summary.NotConsumedUsers++
-		}
-		if user.CheckedIn {
-			summary.CheckedUsers++
-		} else {
-			summary.NotCheckedUsers++
-		}
+	summary.NotConsumedUsers = summary.TotalUsers - summary.ConsumedUsers
+
+	if err := buildUserActivityQuery(tx, keyword, group, UserActivityFilter{
+		Days:          filter.Days,
+		ConsumeStatus: "all",
+		CheckinStatus: "checked",
+		UserStatus:    filter.UserStatus,
+	}).Count(&summary.CheckedUsers).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+	summary.NotCheckedUsers = summary.TotalUsers - summary.CheckedUsers
+
+	if err := tx.Commit().Error; err != nil {
+		return nil, err
 	}
 
 	return summary, nil
