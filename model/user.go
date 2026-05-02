@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
@@ -47,11 +48,12 @@ type User struct {
 	DeletedAt        gorm.DeletedAt `gorm:"index"`
 	LinuxDOId        string         `json:"linux_do_id" gorm:"column:linux_do_id;index"`
 	Setting          string         `json:"setting" gorm:"type:text;column:setting"`
-	Remark           string         `json:"remark,omitempty" gorm:"type:varchar(255)" validate:"max=255"`
-	StripeCustomer   string         `json:"stripe_customer" gorm:"type:varchar(64);column:stripe_customer;index"`
-	CreatedAt      int64          `json:"created_at" gorm:"autoCreateTime;column:created_at"`
-	LastLoginAt    int64          `json:"last_login_at" gorm:"default:0;column:last_login_at"`
-	LastLoginIP    string         `json:"last_login_ip" gorm:"type:varchar(64);default:'';column:last_login_ip"`
+	Remark            string         `json:"remark,omitempty" gorm:"type:varchar(255)" validate:"max=255"`
+	StripeCustomer    string         `json:"stripe_customer" gorm:"type:varchar(64);column:stripe_customer;index"`
+	AutoDisabledUntil int64          `json:"auto_disabled_until" gorm:"type:bigint;default:0;column:auto_disabled_until;index"`
+	CreatedAt         int64          `json:"created_at" gorm:"autoCreateTime;column:created_at"`
+	LastLoginAt       int64          `json:"last_login_at" gorm:"default:0;column:last_login_at"`
+	LastLoginIP       string         `json:"last_login_ip" gorm:"type:varchar(64);default:'';column:last_login_ip"`
 }
 
 func (user *User) ToBaseUser() *UserBase {
@@ -1021,6 +1023,150 @@ func (user *User) FillUserByLinuxDOId() error {
 	}
 	err := DB.Where("linux_do_id = ?", user.LinuxDOId).First(user).Error
 	return err
+}
+
+func CountRecentUserErrors(userId int, lookbackMinutes int) (int64, error) {
+	if userId <= 0 {
+		return 0, errors.New("invalid user id")
+	}
+	if lookbackMinutes <= 0 {
+		lookbackMinutes = common.AutomaticDisableUserLookbackMinutes
+	}
+	if lookbackMinutes <= 0 {
+		lookbackMinutes = 60
+	}
+	startTimestamp := time.Now().Add(-time.Duration(lookbackMinutes) * time.Minute).Unix()
+	var count int64
+	err := LOG_DB.Model(&Log{}).
+		Where("user_id = ? AND created_at >= ? AND type = ?", userId, startTimestamp, LogTypeError).
+		Count(&count).Error
+	return count, err
+}
+
+func AutoDisableUserIfNeeded(userId int) error {
+	if !common.AutomaticDisableUserEnabled || userId <= 0 {
+		return nil
+	}
+	var autoDisabled bool
+	var disabledUntil int64
+	var errorCount int64
+
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var user User
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("id = ?", userId).First(&user).Error; err != nil {
+			return err
+		}
+		if user.Role >= common.RoleAdminUser {
+			return nil
+		}
+		if user.Status != common.UserStatusEnabled {
+			return nil
+		}
+
+		count, err := CountRecentUserErrors(userId, common.AutomaticDisableUserLookbackMinutes)
+		if err != nil {
+			return err
+		}
+		errorCount = count
+		if count < int64(common.AutomaticDisableUserErrorThreshold) {
+			return nil
+		}
+
+		durationMinutes := common.AutomaticDisableUserDurationMinutes
+		if durationMinutes <= 0 {
+			durationMinutes = 60
+		}
+		disabledUntil = time.Now().Add(time.Duration(durationMinutes) * time.Minute).Unix()
+		if err := tx.Model(&User{}).Where("id = ?", userId).Updates(map[string]interface{}{
+			"status":              common.UserStatusDisabled,
+			"auto_disabled_until": disabledUntil,
+		}).Error; err != nil {
+			return err
+		}
+		autoDisabled = true
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if !autoDisabled {
+		return nil
+	}
+
+	_ = InvalidateUserCache(userId)
+	_ = InvalidateUserTokensCache(userId)
+	RecordLog(userId, LogTypeSystem, fmt.Sprintf("用户最近 %d 分钟内错误次数达到 %d 次，系统已自动封禁 %d 分钟，解封时间：%s",
+		common.AutomaticDisableUserLookbackMinutes,
+		errorCount,
+		common.AutomaticDisableUserDurationMinutes,
+		time.Unix(disabledUntil, 0).Format("2006-01-02 15:04:05")))
+	return nil
+}
+
+func AutoEnableUserIfDue(userId int) (bool, error) {
+	if userId <= 0 {
+		return false, errors.New("invalid user id")
+	}
+	now := common.GetTimestamp()
+	autoEnabled := false
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var user User
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").
+			Where("id = ?", userId).
+			First(&user).Error; err != nil {
+			return err
+		}
+		if user.Status != common.UserStatusDisabled || user.AutoDisabledUntil <= 0 || user.AutoDisabledUntil > now {
+			return nil
+		}
+		if err := tx.Model(&User{}).Where("id = ?", user.Id).Updates(map[string]interface{}{
+			"status":              common.UserStatusEnabled,
+			"auto_disabled_until": 0,
+		}).Error; err != nil {
+			return err
+		}
+		autoEnabled = true
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+	if !autoEnabled {
+		return false, nil
+	}
+	_ = InvalidateUserCache(userId)
+	_ = InvalidateUserTokensCache(userId)
+	RecordLog(userId, LogTypeSystem, "用户自动封禁已到期，系统已自动解封")
+	return true, nil
+}
+
+func AutoEnableDueUsers(limit int) (int64, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	now := common.GetTimestamp()
+	var users []User
+	if err := DB.Where("status = ? AND auto_disabled_until > 0 AND auto_disabled_until <= ?", common.UserStatusDisabled, now).
+		Order("auto_disabled_until asc, id asc").
+		Limit(limit).
+		Find(&users).Error; err != nil {
+		return 0, err
+	}
+	if len(users) == 0 {
+		return 0, nil
+	}
+
+	var enabledCount int64
+	for _, user := range users {
+		enabled, err := AutoEnableUserIfDue(user.Id)
+		if err != nil {
+			return enabledCount, err
+		}
+		if enabled {
+			enabledCount++
+		}
+	}
+	return enabledCount, nil
 }
 
 func RootUserExists() bool {

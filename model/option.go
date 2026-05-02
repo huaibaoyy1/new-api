@@ -47,6 +47,7 @@ func InitOptionMap() {
 	common.OptionMap["InvitationCodeEnabled"] = strconv.FormatBool(common.InvitationCodeEnabled)
 	common.OptionMap["AutomaticDisableChannelEnabled"] = strconv.FormatBool(common.AutomaticDisableChannelEnabled)
 	common.OptionMap["AutomaticEnableChannelEnabled"] = strconv.FormatBool(common.AutomaticEnableChannelEnabled)
+	common.OptionMap["AutomaticDisableUserEnabled"] = strconv.FormatBool(common.AutomaticDisableUserEnabled)
 	common.OptionMap["LogConsumeEnabled"] = strconv.FormatBool(common.LogConsumeEnabled)
 	common.OptionMap["DisplayInCurrencyEnabled"] = strconv.FormatBool(common.DisplayInCurrencyEnabled)
 	common.OptionMap["DisplayTokenStatEnabled"] = strconv.FormatBool(common.DisplayTokenStatEnabled)
@@ -138,6 +139,9 @@ func InitOptionMap() {
 	common.OptionMap["QuotaForInvitee"] = strconv.Itoa(common.QuotaForInvitee)
 	common.OptionMap["QuotaRemindThreshold"] = strconv.Itoa(common.QuotaRemindThreshold)
 	common.OptionMap["PreConsumedQuota"] = strconv.Itoa(common.PreConsumedQuota)
+	common.OptionMap["AutomaticDisableUserErrorThreshold"] = strconv.Itoa(common.AutomaticDisableUserErrorThreshold)
+	common.OptionMap["AutomaticDisableUserDurationMinutes"] = strconv.Itoa(common.AutomaticDisableUserDurationMinutes)
+	common.OptionMap["AutomaticDisableUserLookbackMinutes"] = strconv.Itoa(common.AutomaticDisableUserLookbackMinutes)
 	common.OptionMap["ModelRequestRateLimitCount"] = strconv.Itoa(setting.ModelRequestRateLimitCount)
 	common.OptionMap["ModelRequestRateLimitDurationMinutes"] = strconv.Itoa(setting.ModelRequestRateLimitDurationMinutes)
 	common.OptionMap["ModelRequestRateLimitSuccessCount"] = strconv.Itoa(setting.ModelRequestRateLimitSuccessCount)
@@ -278,6 +282,8 @@ func updateOptionMap(key string, value string) (err error) {
 			common.AutomaticDisableChannelEnabled = boolValue
 		case "AutomaticEnableChannelEnabled":
 			common.AutomaticEnableChannelEnabled = boolValue
+		case "AutomaticDisableUserEnabled":
+			common.AutomaticDisableUserEnabled = boolValue
 		case "LogConsumeEnabled":
 			common.LogConsumeEnabled = boolValue
 		case "DisplayInCurrencyEnabled":
@@ -488,6 +494,12 @@ func updateOptionMap(key string, value string) (err error) {
 		common.QuotaRemindThreshold, _ = strconv.Atoi(value)
 	case "PreConsumedQuota":
 		common.PreConsumedQuota, _ = strconv.Atoi(value)
+	case "AutomaticDisableUserErrorThreshold":
+		common.AutomaticDisableUserErrorThreshold, _ = strconv.Atoi(value)
+	case "AutomaticDisableUserDurationMinutes":
+		common.AutomaticDisableUserDurationMinutes, _ = strconv.Atoi(value)
+	case "AutomaticDisableUserLookbackMinutes":
+		common.AutomaticDisableUserLookbackMinutes, _ = strconv.Atoi(value)
 	case "ModelRequestRateLimitCount":
 		setting.ModelRequestRateLimitCount, _ = strconv.Atoi(value)
 	case "ModelRequestRateLimitDurationMinutes":

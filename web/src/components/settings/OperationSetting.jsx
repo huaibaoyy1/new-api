@@ -25,6 +25,7 @@ import SettingsSidebarModulesAdmin from '../../pages/Setting/Operation/SettingsS
 import SettingsSensitiveWords from '../../pages/Setting/Operation/SettingsSensitiveWords';
 import SettingsLog from '../../pages/Setting/Operation/SettingsLog';
 import SettingsMonitoring from '../../pages/Setting/Operation/SettingsMonitoring';
+import SettingsUserRiskControl from '../../pages/Setting/Operation/SettingsUserRiskControl';
 import SettingsCreditLimit from '../../pages/Setting/Operation/SettingsCreditLimit';
 import SettingsCheckin from '../../pages/Setting/Operation/SettingsCheckin';
 import { API, showError, toBoolean } from '../../helpers';
@@ -69,6 +70,10 @@ const OperationSetting = () => {
     QuotaRemindThreshold: 0,
     AutomaticDisableChannelEnabled: false,
     AutomaticEnableChannelEnabled: false,
+    AutomaticDisableUserEnabled: false,
+    AutomaticDisableUserErrorThreshold: 20,
+    AutomaticDisableUserDurationMinutes: 60,
+    AutomaticDisableUserLookbackMinutes: 60,
     AutomaticDisableKeywords: '',
     AutomaticDisableStatusCodes: '401',
     AutomaticRetryStatusCodes:
@@ -145,6 +150,10 @@ const OperationSetting = () => {
         {/* 监控设置 */}
         <Card style={{ marginTop: '10px' }}>
           <SettingsMonitoring options={inputs} refresh={onRefresh} />
+        </Card>
+        {/* 账户风控设置 */}
+        <Card style={{ marginTop: '10px' }}>
+          <SettingsUserRiskControl options={inputs} refresh={onRefresh} />
         </Card>
         {/* 额度设置 */}
         <Card style={{ marginTop: '10px' }}>

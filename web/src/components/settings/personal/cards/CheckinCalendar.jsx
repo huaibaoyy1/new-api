@@ -46,6 +46,8 @@ const CheckinCalendar = ({ t, status, turnstileEnabled, turnstileSiteKey }) => {
   const [turnstileWidgetKey, setTurnstileWidgetKey] = useState(0);
   const [checkinData, setCheckinData] = useState({
     enabled: false,
+    checkin_nonce: '',
+    nonce_date: '',
     stats: {
       checked_in_today: false,
       total_checkins: 0,
@@ -113,11 +115,33 @@ const CheckinCalendar = ({ t, status, turnstileEnabled, turnstileSiteKey }) => {
     }
   };
 
+  const sha256Hex = async (input) => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(input);
+    const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+  };
+
   const postCheckin = async (token) => {
     const url = token
       ? `/api/user/checkin?turnstile=${encodeURIComponent(token)}`
       : '/api/user/checkin';
-    return API.post(url);
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const userId = user?.id;
+    const nonce = checkinData.checkin_nonce || '';
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const signature = await sha256Hex(`${userId}:${timestamp}:${nonce}`);
+    return API.post(
+      url,
+      {},
+      {
+        headers: {
+          'X-Checkin-Timestamp': timestamp,
+          'X-Checkin-Signature': signature,
+        },
+      },
+    );
   };
 
   const resetTurnstileWidget = () => {

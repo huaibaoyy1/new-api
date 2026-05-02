@@ -27,6 +27,15 @@ func GenerateOAuthCode(c *gin.Context) {
 	if affCode != "" {
 		session.Set("aff", affCode)
 	}
+	providerName := c.Query("provider")
+	invitationCode := c.Query("invitation_code")
+	if providerName == "linuxdo" {
+		if invitationCode != "" {
+			session.Set("invitation_code", invitationCode)
+		} else {
+			session.Delete("invitation_code")
+		}
+	}
 	session.Set("oauth_state", state)
 	err := session.Save()
 	if err != nil {
@@ -198,6 +207,9 @@ func handleOAuthBind(c *gin.Context, provider oauth.Provider) {
 // findOrCreateOAuthUser finds existing user or creates new user
 func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *oauth.OAuthUser, session sessions.Session) (*model.User, error) {
 	user := &model.User{}
+	providerName := c.Param("provider")
+	invitationCode := ""
+	requireInvitationCode := common.InvitationCodeEnabled && providerName == "linuxdo"
 
 	// Check if user already exists with new ID
 	if provider.IsUserIDTaken(oauthUser.ProviderUserID) {
@@ -269,6 +281,20 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 		inviterId, _ = model.GetUserIdByAffCode(affCode.(string))
 	}
 
+	if requireInvitationCode {
+		invitationCodeValue := session.Get("invitation_code")
+		if invitationCodeValue == nil {
+			return nil, fmt.Errorf("邀请码不能为空")
+		}
+		invitationCode = invitationCodeValue.(string)
+		if invitationCode == "" {
+			return nil, fmt.Errorf("邀请码不能为空")
+		}
+		if _, err := model.ValidateInvitationCode(invitationCode); err != nil {
+			return nil, err
+		}
+	}
+
 	// Use transaction to ensure user creation and OAuth binding are atomic
 	if genericProvider, ok := provider.(*oauth.GenericOAuthProvider); ok {
 		// Custom provider: create user and binding in a transaction
@@ -276,6 +302,11 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 			// Create user
 			if err := user.InsertWithTx(tx, inviterId); err != nil {
 				return err
+			}
+			if requireInvitationCode {
+				if err := model.ConsumeInvitationCodeWithTx(tx, invitationCode, user.Id); err != nil {
+					return err
+				}
 			}
 
 			// Create OAuth binding
@@ -296,12 +327,21 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 
 		// Perform post-transaction tasks (logs, sidebar config, inviter rewards)
 		user.FinalizeOAuthUserCreation(inviterId)
+		if requireInvitationCode {
+			session.Delete("invitation_code")
+			_ = session.Save()
+		}
 	} else {
 		// Built-in provider: create user and update provider ID in a transaction
 		err := model.DB.Transaction(func(tx *gorm.DB) error {
 			// Create user
 			if err := user.InsertWithTx(tx, inviterId); err != nil {
 				return err
+			}
+			if requireInvitationCode {
+				if err := model.ConsumeInvitationCodeWithTx(tx, invitationCode, user.Id); err != nil {
+					return err
+				}
 			}
 
 			// Set the provider user ID on the user model and update
@@ -325,6 +365,10 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 
 		// Perform post-transaction tasks
 		user.FinalizeOAuthUserCreation(inviterId)
+		if requireInvitationCode {
+			session.Delete("invitation_code")
+			_ = session.Save()
+		}
 	}
 
 	return user, nil

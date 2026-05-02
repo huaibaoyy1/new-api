@@ -207,66 +207,82 @@ const UserRiskModal = ({
         width={1100}
         centered
       >
-        <div className='space-y-4'>
-        <Space wrap spacing={12}>
-          <Card style={metricCardStyle}>
-            <Typography.Text type='tertiary'>风险等级</Typography.Text>
-            <div className='mt-2'>
-              <Tag
-                color={riskColorMap[summary?.risk_level] || 'grey'}
-                size='large'
-                shape='circle'
-              >
-                {riskTextMap[summary?.risk_level] || '未知'}
-              </Tag>
-            </div>
-          </Card>
-          <Card style={metricCardStyle}>
-            <Typography.Text type='tertiary'>总请求数</Typography.Text>
-            <div className='mt-2 text-lg font-semibold'>
-              {renderNumber(summary?.total_requests || 0)}
-            </div>
-          </Card>
-          <Card style={metricCardStyle}>
-            <Typography.Text type='tertiary'>成功数</Typography.Text>
-            <div className='mt-2 text-lg font-semibold text-green-600'>
-              {renderNumber(summary?.success_count || 0)}
-            </div>
-          </Card>
-          <Card style={metricCardStyle}>
-            <Typography.Text type='tertiary'>错误数</Typography.Text>
-            <div className='mt-2 text-lg font-semibold text-red-600'>
-              {renderNumber(summary?.error_count || 0)}
-            </div>
-          </Card>
-          <Card style={metricCardStyle}>
-            <Typography.Text type='tertiary'>错误率</Typography.Text>
-            <div className='mt-2 text-lg font-semibold'>
-              {Number(summary?.error_rate || 0).toFixed(2)}%
-            </div>
-          </Card>
-        </Space>
+        <div
+          className='space-y-4'
+          style={{
+            maxHeight: '75vh',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <div style={{ flexShrink: 0 }}>
+            <Space wrap spacing={12}>
+              <Card style={metricCardStyle}>
+                <Typography.Text type='tertiary'>风险等级</Typography.Text>
+                <div className='mt-2'>
+                  <Tag
+                    color={riskColorMap[summary?.risk_level] || 'grey'}
+                    size='large'
+                    shape='circle'
+                  >
+                    {riskTextMap[summary?.risk_level] || '未知'}
+                  </Tag>
+                </div>
+              </Card>
+              <Card style={metricCardStyle}>
+                <Typography.Text type='tertiary'>总请求数</Typography.Text>
+                <div className='mt-2 text-lg font-semibold'>
+                  {renderNumber(summary?.total_requests || 0)}
+                </div>
+              </Card>
+              <Card style={metricCardStyle}>
+                <Typography.Text type='tertiary'>成功数</Typography.Text>
+                <div className='mt-2 text-lg font-semibold text-green-600'>
+                  {renderNumber(summary?.success_count || 0)}
+                </div>
+              </Card>
+              <Card style={metricCardStyle}>
+                <Typography.Text type='tertiary'>错误数</Typography.Text>
+                <div className='mt-2 text-lg font-semibold text-red-600'>
+                  {renderNumber(summary?.error_count || 0)}
+                </div>
+              </Card>
+              <Card style={metricCardStyle}>
+                <Typography.Text type='tertiary'>错误率</Typography.Text>
+                <div className='mt-2 text-lg font-semibold'>
+                  {Number(summary?.error_rate || 0).toFixed(2)}%
+                </div>
+              </Card>
+            </Space>
 
-        <Space wrap spacing={12}>
-          <Tag color='green' size='large'>2xx: {summary?.status_2xx || 0}</Tag>
-          <Tag color='orange' size='large'>4xx: {summary?.status_4xx || 0}</Tag>
-          <Tag color='red' size='large'>5xx: {summary?.status_5xx || 0}</Tag>
-          <Tag color='red' size='large'>401: {summary?.status_401 || 0}</Tag>
-          <Tag color='red' size='large'>403: {summary?.status_403 || 0}</Tag>
-          <Tag color='orange' size='large'>422: {summary?.status_422 || 0}</Tag>
-          <Tag color='red' size='large'>429: {summary?.status_429 || 0}</Tag>
-        </Space>
+            <div style={{ marginTop: 12 }}>
+              <Space wrap spacing={12}>
+                <Tag color='green' size='large'>2xx: {summary?.status_2xx || 0}</Tag>
+                <Tag color='orange' size='large'>4xx: {summary?.status_4xx || 0}</Tag>
+                <Tag color='red' size='large'>5xx: {summary?.status_5xx || 0}</Tag>
+                <Tag color='red' size='large'>401: {summary?.status_401 || 0}</Tag>
+                <Tag color='red' size='large'>403: {summary?.status_403 || 0}</Tag>
+                <Tag color='orange' size='large'>422: {summary?.status_422 || 0}</Tag>
+                <Tag color='red' size='large'>429: {summary?.status_429 || 0}</Tag>
+              </Space>
+            </div>
+          </div>
 
           <Card
             title='最近异常请求'
             bodyStyle={{ padding: 0 }}
+            style={{
+              flex: 1,
+              minHeight: 0,
+              overflow: 'hidden',
+            }}
           >
             <Table
               rowKey='id'
               dataSource={logs || []}
               columns={columns}
               loading={loading}
-              scroll={{ x: 1200 }}
+              scroll={{ x: 1200, y: 420 }}
               pagination={{
                 currentPage: (pagination?.page || 0) + 1,
                 pageSize: pagination?.pageSize || 10,

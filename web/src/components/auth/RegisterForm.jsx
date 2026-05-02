@@ -399,10 +399,26 @@ const RegisterForm = () => {
     }
   };
 
-  const handleLinuxDOClick = () => {
+  const handleLinuxDOClick = async () => {
+    if (invitationCodeEnabled) {
+      const invitationCode = (inputs.invitation_code || '').trim();
+      if (!invitationCode) {
+        showInfo('请输入邀请码');
+        return;
+      }
+      const isValid = await validateInvitationCode(invitationCode);
+      if (!isValid) {
+        showError(invitationCodeValidation.message || '邀请码无效');
+        return;
+      }
+    }
+
     setLinuxdoLoading(true);
     try {
-      onLinuxDOOAuthClicked(status.linuxdo_client_id, { shouldLogout: true });
+      await onLinuxDOOAuthClicked(status.linuxdo_client_id, {
+        shouldLogout: true,
+        invitationCode: (inputs.invitation_code || '').trim(),
+      });
     } finally {
       setTimeout(() => setLinuxdoLoading(false), 3000);
     }

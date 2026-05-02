@@ -404,6 +404,13 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 		}
 		useTimeSeconds := int(time.Since(startTime).Seconds())
 		model.RecordErrorLog(c, userId, channelId, modelName, tokenName, err.MaskSensitiveErrorWithStatusCode(), tokenId, useTimeSeconds, common.GetContextKeyBool(c, constant.ContextKeyIsStream), userGroup, other)
+		if userId > 0 && common.AutomaticDisableUserEnabled {
+			gopool.Go(func() {
+				if disableErr := model.AutoDisableUserIfNeeded(userId); disableErr != nil {
+					common.SysLog("failed to auto disable user: " + disableErr.Error())
+				}
+			})
+		}
 	}
 
 }

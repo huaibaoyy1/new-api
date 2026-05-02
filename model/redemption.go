@@ -121,6 +121,7 @@ func Redeem(key string, userId int) (quota int, err error) {
 		return 0, errors.New("无效的 user id")
 	}
 	redemption := &Redemption{}
+	userUpgradedToVIP := false
 
 	keyCol := "`key`"
 	if common.UsingPostgreSQL {
@@ -145,6 +146,20 @@ func Redeem(key string, userId int) (quota int, err error) {
 		if err != nil {
 			return err
 		}
+
+		var currentGroup string
+		err = tx.Model(&User{}).Where("id = ?", userId).Select(commonGroupCol).Find(&currentGroup).Error
+		if err != nil {
+			return err
+		}
+		if currentGroup != "vip" {
+			err = tx.Model(&User{}).Where("id = ?", userId).Update("group", "vip").Error
+			if err != nil {
+				return err
+			}
+			userUpgradedToVIP = true
+		}
+
 		redemption.RedeemedTime = common.GetTimestamp()
 		redemption.Status = common.RedemptionCodeStatusUsed
 		redemption.UsedUserId = userId
@@ -155,7 +170,12 @@ func Redeem(key string, userId int) (quota int, err error) {
 		common.SysError("redemption failed: " + err.Error())
 		return 0, ErrRedeemFailed
 	}
-	RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码充值 %s，兑换码ID %d", logger.LogQuota(redemption.Quota), redemption.Id))
+	if userUpgradedToVIP {
+		_ = UpdateUserGroupCache(userId, "vip")
+		RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码充值 %s，兑换码ID %d，并自动升级为 VIP", logger.LogQuota(redemption.Quota), redemption.Id))
+	} else {
+		RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码充值 %s，兑换码ID %d，用户已是 VIP，跳过升级", logger.LogQuota(redemption.Quota), redemption.Id))
+	}
 	return redemption.Quota, nil
 }
 
@@ -232,7 +252,10 @@ func ValidateInvitationCode(code string) (*Redemption, error) {
 	return redemption, nil
 }
 
-func ConsumeInvitationCode(code string, userId int) error {
+func ConsumeInvitationCodeWithTx(tx *gorm.DB, code string, userId int) error {
+	if tx == nil {
+		return errors.New("tx is nil")
+	}
 	if code == "" {
 		return errors.New("未提供邀请码")
 	}
@@ -243,27 +266,31 @@ func ConsumeInvitationCode(code string, userId int) error {
 	if common.UsingPostgreSQL {
 		keyCol = `"key"`
 	}
+	redemption := &Redemption{}
+	err := tx.Set("gorm:query_option", "FOR UPDATE").Where(keyCol+" = ?", code).First(redemption).Error
+	if err != nil {
+		return errors.New("无效的邀请码")
+	}
+	if redemption.Status != common.RedemptionCodeStatusEnabled {
+		return errors.New("邀请码已被使用")
+	}
+	if redemption.Type == "" {
+		redemption.Type = common.RedemptionTypeQuota
+	}
+	if redemption.Type != common.RedemptionTypeInvitation {
+		return errors.New("邀请码类型无效")
+	}
+	if redemption.ExpiredTime != 0 && redemption.ExpiredTime < common.GetTimestamp() {
+		return errors.New("邀请码已过期")
+	}
+	redemption.RedeemedTime = common.GetTimestamp()
+	redemption.Status = common.RedemptionCodeStatusUsed
+	redemption.UsedUserId = userId
+	return tx.Save(redemption).Error
+}
+
+func ConsumeInvitationCode(code string, userId int) error {
 	return DB.Transaction(func(tx *gorm.DB) error {
-		redemption := &Redemption{}
-		err := tx.Set("gorm:query_option", "FOR UPDATE").Where(keyCol+" = ?", code).First(redemption).Error
-		if err != nil {
-			return errors.New("无效的邀请码")
-		}
-		if redemption.Status != common.RedemptionCodeStatusEnabled {
-			return errors.New("邀请码已被使用")
-		}
-		if redemption.Type == "" {
-			redemption.Type = common.RedemptionTypeQuota
-		}
-		if redemption.Type != common.RedemptionTypeInvitation {
-			return errors.New("邀请码类型无效")
-		}
-		if redemption.ExpiredTime != 0 && redemption.ExpiredTime < common.GetTimestamp() {
-			return errors.New("邀请码已过期")
-		}
-		redemption.RedeemedTime = common.GetTimestamp()
-		redemption.Status = common.RedemptionCodeStatusUsed
-		redemption.UsedUserId = userId
-		return tx.Save(redemption).Error
+		return ConsumeInvitationCodeWithTx(tx, code, userId)
 	})
 }

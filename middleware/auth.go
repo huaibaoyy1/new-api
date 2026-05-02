@@ -77,6 +77,11 @@ func authHelper(c *gin.Context, minRole int) {
 				c.Abort()
 				return
 			}
+			if user.Status == common.UserStatusDisabled && user.AutoDisabledUntil > 0 && user.AutoDisabledUntil <= common.GetTimestamp() {
+				if enabled, enableErr := model.AutoEnableUserIfDue(user.Id); enableErr == nil && enabled {
+					user.Status = common.UserStatusEnabled
+				}
+			}
 			// Token is valid
 			username = user.Username
 			role = user.Role
@@ -91,7 +96,47 @@ func authHelper(c *gin.Context, minRole int) {
 			c.Abort()
 			return
 		}
+	} else {
+		userId, ok := id.(int)
+		if !ok || userId <= 0 {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"success": false,
+				"message": common.TranslateMessage(c, i18n.MsgAuthNotLoggedIn),
+			})
+			c.Abort()
+			return
+		}
+		userCache, cacheErr := model.GetUserCache(userId)
+		if cacheErr != nil {
+			common.SysLog(fmt.Sprintf("authHelper GetUserCache error for user %d: %v", userId, cacheErr))
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"message": common.TranslateMessage(c, i18n.MsgDatabaseError),
+			})
+			c.Abort()
+			return
+		}
+		if userCache.Status == common.UserStatusDisabled {
+			if enabled, enableErr := model.AutoEnableUserIfDue(userId); enableErr == nil && enabled {
+				userCache, cacheErr = model.GetUserCache(userId)
+				if cacheErr != nil {
+					common.SysLog(fmt.Sprintf("authHelper GetUserCache error for user %d after auto enable: %v", userId, cacheErr))
+					c.JSON(http.StatusInternalServerError, gin.H{
+						"success": false,
+						"message": common.TranslateMessage(c, i18n.MsgDatabaseError),
+					})
+					c.Abort()
+					return
+				}
+			}
+		}
+		username = userCache.Username
+		status = userCache.Status
+		session.Set("status", userCache.Status)
+		session.Set("group", userCache.Group)
+		_ = session.Save()
 	}
+
 	// get header New-Api-User
 	apiUserIdStr := c.Request.Header.Get("New-Api-User")
 	if apiUserIdStr == "" {
@@ -121,12 +166,18 @@ func authHelper(c *gin.Context, minRole int) {
 		return
 	}
 	if status.(int) == common.UserStatusDisabled {
-		c.JSON(http.StatusOK, gin.H{
-			"success": false,
-			"message": common.TranslateMessage(c, i18n.MsgAuthUserBanned),
-		})
-		c.Abort()
-		return
+		if enabled, err := model.AutoEnableUserIfDue(id.(int)); err == nil && enabled {
+			status = common.UserStatusEnabled
+			session.Set("status", common.UserStatusEnabled)
+			_ = session.Save()
+		} else {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": common.TranslateMessage(c, i18n.MsgAuthUserBanned),
+			})
+			c.Abort()
+			return
+		}
 	}
 	if role.(int) < minRole {
 		c.JSON(http.StatusOK, gin.H{
@@ -196,10 +247,23 @@ func TokenOrUserAuth() func(c *gin.Context) {
 		// Try session auth first (dashboard users)
 		session := sessions.Default(c)
 		if id := session.Get("id"); id != nil {
-			if status, ok := session.Get("status").(int); ok && status == common.UserStatusEnabled {
-				c.Set("id", id)
-				c.Next()
-				return
+			if userId, ok := id.(int); ok && userId > 0 {
+				userCache, err := model.GetUserCache(userId)
+				if err == nil {
+					if userCache.Status != common.UserStatusEnabled {
+						if enabled, enableErr := model.AutoEnableUserIfDue(userId); enableErr == nil && enabled {
+							userCache, err = model.GetUserCache(userId)
+						}
+					}
+					if err == nil && userCache.Status == common.UserStatusEnabled {
+						session.Set("status", userCache.Status)
+						session.Set("group", userCache.Group)
+						_ = session.Save()
+						c.Set("id", userId)
+						c.Next()
+						return
+					}
+				}
 			}
 		}
 		// Fall back to token auth (API clients)
@@ -258,12 +322,24 @@ func TokenAuthReadOnly() func(c *gin.Context) {
 			return
 		}
 		if userCache.Status != common.UserStatusEnabled {
-			c.JSON(http.StatusForbidden, gin.H{
-				"success": false,
-				"message": common.TranslateMessage(c, i18n.MsgAuthUserBanned),
-			})
-			c.Abort()
-			return
+			if enabled, enableErr := model.AutoEnableUserIfDue(token.UserId); enableErr == nil && enabled {
+				userCache, err = model.GetUserCache(token.UserId)
+				if err != nil || userCache.Status != common.UserStatusEnabled {
+					c.JSON(http.StatusForbidden, gin.H{
+						"success": false,
+						"message": common.TranslateMessage(c, i18n.MsgAuthUserBanned),
+					})
+					c.Abort()
+					return
+				}
+			} else {
+				c.JSON(http.StatusForbidden, gin.H{
+					"success": false,
+					"message": common.TranslateMessage(c, i18n.MsgAuthUserBanned),
+				})
+				c.Abort()
+				return
+			}
 		}
 
 		c.Set("id", token.UserId)
@@ -372,6 +448,18 @@ func TokenAuth() func(c *gin.Context) {
 			return
 		}
 		userEnabled := userCache.Status == common.UserStatusEnabled
+		if !userEnabled {
+			if enabled, enableErr := model.AutoEnableUserIfDue(token.UserId); enableErr == nil && enabled {
+				userCache, err = model.GetUserCache(token.UserId)
+				if err != nil {
+					common.SysLog(fmt.Sprintf("TokenAuth GetUserCache error for user %d after auto enable: %v", token.UserId, err))
+					abortWithOpenAiMessage(c, http.StatusInternalServerError,
+						common.TranslateMessage(c, i18n.MsgDatabaseError))
+					return
+				}
+				userEnabled = userCache.Status == common.UserStatusEnabled
+			}
+		}
 		if !userEnabled {
 			abortWithOpenAiMessage(c, http.StatusForbidden, common.TranslateMessage(c, i18n.MsgAuthUserBanned))
 			return

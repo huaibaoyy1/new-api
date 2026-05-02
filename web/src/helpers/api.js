@@ -240,11 +240,22 @@ export const processGroupsData = (data, userGroup) => {
 
 // 原来components中的utils.js
 
-export async function getOAuthState() {
+export async function getOAuthState(options = {}) {
   let path = '/api/oauth/state';
+  const params = new URLSearchParams();
   let affCode = localStorage.getItem('aff');
   if (affCode && affCode.length > 0) {
-    path += `?aff=${affCode}`;
+    params.set('aff', affCode);
+  }
+  if (options.provider) {
+    params.set('provider', options.provider);
+  }
+  if (options.invitationCode) {
+    params.set('invitation_code', options.invitationCode);
+  }
+  const query = params.toString();
+  if (query) {
+    path += `?${query}`;
   }
   const res = await API.get(path);
   const { success, message, data } = res.data;
@@ -265,7 +276,7 @@ async function prepareOAuthState(options = {}) {
     localStorage.removeItem('user');
     updateAPI();
   }
-  return await getOAuthState();
+  return await getOAuthState(options);
 }
 
 export async function onDiscordOAuthClicked(client_id, options = {}) {
@@ -308,7 +319,10 @@ export async function onLinuxDOOAuthClicked(
   linuxdo_client_id,
   options = { shouldLogout: false },
 ) {
-  const state = await prepareOAuthState(options);
+  const state = await prepareOAuthState({
+    ...options,
+    provider: 'linuxdo',
+  });
   if (!state) return;
   redirectToOAuthUrl(
     `https://connect.linux.do/oauth2/authorize?response_type=code&client_id=${linuxdo_client_id}&state=${state}`,
