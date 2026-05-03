@@ -500,6 +500,38 @@ const RegisterForm = () => {
               </Title>
             </div>
             <div className='px-2 py-8'>
+              {invitationCodeEnabled && status.linuxdo_oauth && (
+                <div className='mb-4'>
+                  <Form>
+                    <Form.Input
+                      field='oauth_invitation_code'
+                      label={t('邀请码')}
+                      placeholder={t('请输入邀请码（LinuxDO 注册使用）')}
+                      name='oauth_invitation_code'
+                      value={inputs.invitation_code}
+                      onChange={(value) =>
+                        handleChange('invitation_code', value)
+                      }
+                      suffix={
+                        invitationCodeValidating
+                          ? t('校验中...')
+                          : invitationCodeValidation.valid
+                            ? t('有效')
+                            : ''
+                      }
+                    />
+                  </Form>
+                  <div className='mt-1 text-xs text-gray-500'>
+                    {t('填写邀请码后可直接使用 LinuxDO 注册')}
+                  </div>
+                  {invitationCodeValidation.invalid && (
+                    <div className='mt-1 text-xs text-red-500'>
+                      {invitationCodeValidation.message}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className='space-y-3'>
                 {status.wechat_login && (
                   <Button

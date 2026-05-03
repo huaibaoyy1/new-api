@@ -630,29 +630,21 @@ func GetUserRequestRiskSummary(userId int, days int) (*UserRequestRiskSummary, e
 		days = 7
 	}
 	startTimestamp := time.Now().AddDate(0, 0, -days).Unix()
-
-	summary := &UserRequestRiskSummary{UserId: userId}
-
-	var consumeCount int64
-	if err := LOG_DB.Model(&Log{}).
-		Where("user_id = ? AND created_at >= ? AND type = ?", userId, startTimestamp, LogTypeConsume).
-		Count(&consumeCount).Error; err != nil {
-		return nil, err
-	}
-	summary.SuccessCount = int(consumeCount)
-	summary.Status2xx = summary.SuccessCount
-
-	var errorLogs []*Log
-	err := LOG_DB.Model(&Log{}).
-		Select("user_id, other").
-		Where("user_id = ? AND created_at >= ? AND type = ?", userId, startTimestamp, LogTypeError).
-		Find(&errorLogs).Error
+	var logs []*Log
+	err := LOG_DB.Where("user_id = ? AND created_at >= ? AND type IN ?", userId, startTimestamp, []int{LogTypeConsume, LogTypeError}).
+		Order("id desc").
+		Find(&logs).Error
 	if err != nil {
 		return nil, err
 	}
-
-	for _, log := range errorLogs {
+	summary := &UserRequestRiskSummary{UserId: userId}
+	for _, log := range logs {
 		statusCode := parseRiskStatusCode(log)
+		if log.Type == LogTypeConsume {
+			summary.SuccessCount++
+			summary.Status2xx++
+			continue
+		}
 		summary.ErrorCount++
 		switch {
 		case statusCode >= 200 && statusCode < 300:
@@ -688,48 +680,28 @@ func GetUsersRequestRiskSummary(userIds []int, days int) (map[int]*UserRequestRi
 		days = 7
 	}
 	startTimestamp := time.Now().AddDate(0, 0, -days).Unix()
-
+	var logs []*Log
+	err := LOG_DB.Where("user_id IN ? AND created_at >= ? AND type IN ?", userIds, startTimestamp, []int{LogTypeConsume, LogTypeError}).
+		Order("id desc").
+		Find(&logs).Error
+	if err != nil {
+		return nil, err
+	}
 	for _, userId := range userIds {
 		result[userId] = &UserRequestRiskSummary{UserId: userId, RiskLevel: "low"}
 	}
-
-	var consumeStats []struct {
-		UserId       int   `gorm:"column:user_id"`
-		SuccessCount int64 `gorm:"column:success_count"`
-	}
-	err := LOG_DB.Model(&Log{}).
-		Select("user_id, COUNT(*) AS success_count").
-		Where("user_id IN ? AND created_at >= ? AND type = ?", userIds, startTimestamp, LogTypeConsume).
-		Group("user_id").
-		Find(&consumeStats).Error
-	if err != nil {
-		return nil, err
-	}
-	for _, stat := range consumeStats {
-		summary, ok := result[stat.UserId]
-		if !ok {
-			summary = &UserRequestRiskSummary{UserId: stat.UserId, RiskLevel: "low"}
-			result[stat.UserId] = summary
-		}
-		summary.SuccessCount = int(stat.SuccessCount)
-		summary.Status2xx = int(stat.SuccessCount)
-	}
-
-	var errorLogs []*Log
-	err = LOG_DB.Model(&Log{}).
-		Select("user_id, other").
-		Where("user_id IN ? AND created_at >= ? AND type = ?", userIds, startTimestamp, LogTypeError).
-		Find(&errorLogs).Error
-	if err != nil {
-		return nil, err
-	}
-	for _, log := range errorLogs {
+	for _, log := range logs {
 		summary, ok := result[log.UserId]
 		if !ok {
 			summary = &UserRequestRiskSummary{UserId: log.UserId, RiskLevel: "low"}
 			result[log.UserId] = summary
 		}
 		statusCode := parseRiskStatusCode(log)
+		if log.Type == LogTypeConsume {
+			summary.SuccessCount++
+			summary.Status2xx++
+			continue
+		}
 		summary.ErrorCount++
 		switch {
 		case statusCode >= 200 && statusCode < 300:
