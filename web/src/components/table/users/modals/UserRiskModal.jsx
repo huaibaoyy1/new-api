@@ -94,16 +94,20 @@ const UserRiskModal = ({
     {
       title: '时间',
       dataIndex: 'created_at',
-      render: (value) => (value ? timestamp2string(value) : '-'),
+      width: 170,
+      render: (value) => (
+        <div style={{ whiteSpace: 'nowrap' }}>
+          {value ? timestamp2string(value) : '-'}
+        </div>
+      ),
     },
     {
       title: '状态码',
       dataIndex: 'status_code',
+      width: 90,
       render: (value) => (
         <Tag
-          color={
-            value >= 500 ? 'red' : value >= 400 ? 'orange' : 'green'
-          }
+          color={value >= 500 ? 'red' : value >= 400 ? 'orange' : 'green'}
           shape='circle'
         >
           {value || '-'}
@@ -113,54 +117,136 @@ const UserRiskModal = ({
     {
       title: '错误码',
       dataIndex: 'error_code',
-      render: (value) => value || '-',
+      width: 180,
+      render: (value) => {
+        if (!value) {
+          return '-';
+        }
+        return (
+          <Typography.Text
+            ellipsis={{ showTooltip: true }}
+            style={{ maxWidth: 160 }}
+          >
+            {value}
+          </Typography.Text>
+        );
+      },
+    },
+    {
+      title: '拦截原因',
+      dataIndex: 'reject_reason',
+      width: 120,
+      render: (value) => {
+        if (!value) {
+          return '-';
+        }
+        if (value === 'sensitive_words') {
+          return <Tag color='red'>敏感词拦截</Tag>;
+        }
+        return (
+          <Typography.Text
+            ellipsis={{ showTooltip: true }}
+            style={{ maxWidth: 100 }}
+          >
+            {value}
+          </Typography.Text>
+        );
+      },
+    },
+    {
+      title: '命中词',
+      dataIndex: 'matched_words',
+      width: 180,
+      render: (value) => {
+        if (!Array.isArray(value) || value.length === 0) {
+          return '-';
+        }
+        const previewWords = value.slice(0, 2);
+        const remaining = value.length - previewWords.length;
+        return (
+          <div className='flex flex-wrap gap-1'>
+            {previewWords.map((word) => (
+              <Tag key={word} color='orange' size='small'>
+                {word}
+              </Tag>
+            ))}
+            {remaining > 0 ? (
+              <Tag color='grey' size='small'>
+                +{remaining}
+              </Tag>
+            ) : null}
+          </div>
+        );
+      },
     },
     {
       title: '模型',
       dataIndex: 'model_name',
-      render: (value) => value || '-',
+      width: 100,
+      render: (value) => (
+        <Typography.Text ellipsis={{ showTooltip: true }} style={{ maxWidth: 80 }}>
+          {value || '-'}
+        </Typography.Text>
+      ),
     },
     {
       title: '渠道',
       dataIndex: 'channel_name',
-      render: (_, record) => record.channel_name || record.channel_id || '-',
+      width: 90,
+      render: (_, record) => (
+        <Typography.Text ellipsis={{ showTooltip: true }} style={{ maxWidth: 70 }}>
+          {record.channel_name || record.channel_id || '-'}
+        </Typography.Text>
+      ),
     },
     {
       title: 'Token',
       dataIndex: 'token_name',
-      render: (value) => value || '-',
+      width: 130,
+      render: (value) => (
+        <Typography.Text ellipsis={{ showTooltip: true }} style={{ maxWidth: 110 }}>
+          {value || '-'}
+        </Typography.Text>
+      ),
     },
     {
       title: '额度',
       dataIndex: 'quota',
+      width: 80,
       render: (value) => (value ? renderQuota(value) : '-'),
     },
     {
       title: '耗时(s)',
       dataIndex: 'use_time',
+      width: 90,
       render: (value) => value ?? '-',
     },
     {
       title: 'IP',
       dataIndex: 'ip',
-      render: (value) => value || '-',
+      width: 100,
+      render: (value) => (
+        <Typography.Text ellipsis={{ showTooltip: true }} style={{ maxWidth: 80 }}>
+          {value || '-'}
+        </Typography.Text>
+      ),
     },
     {
       title: '请求摘要',
       dataIndex: 'request_preview',
-      width: 360,
+      width: 320,
       render: (value, record) => {
         if (!value) {
           return '-';
         }
         const previewText =
-          value.length > 280 ? `${value.slice(0, 280)}...` : value;
+          value.length > 120 ? `${value.slice(0, 120)}...` : value;
         return (
-          <div className='max-w-[320px] text-xs leading-5'>
+          <div className='max-w-[280px] text-xs leading-5'>
             <Typography.Paragraph
               style={{ marginBottom: 8 }}
               ellipsis={{
-                rows: 4,
+                rows: 3,
                 showTooltip: false,
               }}
             >
@@ -189,7 +275,7 @@ const UserRiskModal = ({
               size='small'
               onClick={() => openPreviewModal(record)}
             >
-              查看全文
+              查看详情
             </Button>
           </div>
         );
@@ -282,7 +368,7 @@ const UserRiskModal = ({
               dataSource={logs || []}
               columns={columns}
               loading={loading}
-              scroll={{ x: 1200, y: 420 }}
+              scroll={{ x: 1550, y: 420 }}
               pagination={{
                 currentPage: (pagination?.page || 0) + 1,
                 pageSize: pagination?.pageSize || 10,
@@ -314,6 +400,17 @@ const UserRiskModal = ({
             <Tag color='grey'>
               渠道：{activePreviewRecord?.channel_name || activePreviewRecord?.channel_id || '-'}
             </Tag>
+            {activePreviewRecord?.reject_reason === 'sensitive_words' ? (
+              <Tag color='red'>敏感词拦截</Tag>
+            ) : null}
+            {Array.isArray(activePreviewRecord?.matched_words) &&
+            activePreviewRecord.matched_words.length > 0
+              ? activePreviewRecord.matched_words.map((word) => (
+                  <Tag color='orange' key={word}>
+                    {word}
+                  </Tag>
+                ))
+              : null}
             {previewMetaTags}
           </Space>
           <Card bodyStyle={{ maxHeight: 480, overflowY: 'auto' }}>

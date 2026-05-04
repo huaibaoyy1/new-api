@@ -136,7 +136,51 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		contains, words := service.CheckSensitiveText(meta.CombineText)
 		if contains {
 			logger.LogWarn(c, fmt.Sprintf("user sensitive words detected: %s", strings.Join(words, ", ")))
-			newAPIError = types.NewError(err, types.ErrorCodeSensitiveWordsDetected)
+			sensitiveErr := errors.New("请求因命中敏感词被拦截")
+			newAPIError = types.NewError(sensitiveErr, types.ErrorCodeSensitiveWordsDetected)
+
+			if constant.ErrorLogEnabled && types.IsRecordErrorLog(newAPIError) {
+				userId := c.GetInt("id")
+				tokenName := c.GetString("token_name")
+				modelName := c.GetString("original_model")
+				tokenId := c.GetInt("token_id")
+				userGroup := c.GetString("group")
+				channelId := c.GetInt("channel_id")
+
+				other := make(map[string]interface{})
+				if c.Request != nil && c.Request.URL != nil {
+					other["request_path"] = c.Request.URL.Path
+				}
+				other["error_type"] = newAPIError.GetErrorType()
+				other["error_code"] = newAPIError.GetErrorCode()
+				other["status_code"] = newAPIError.StatusCode
+				other["reject_reason"] = "sensitive_words"
+
+				adminInfo := make(map[string]interface{})
+				adminInfo["matched_words"] = words
+				other["admin_info"] = adminInfo
+
+				startTime := common.GetContextKeyTime(c, constant.ContextKeyRequestStartTime)
+				if startTime.IsZero() {
+					startTime = time.Now()
+				}
+				useTimeSeconds := int(time.Since(startTime).Seconds())
+
+				model.RecordErrorLog(
+					c,
+					userId,
+					channelId,
+					modelName,
+					tokenName,
+					"请求因命中敏感词被拦截",
+					tokenId,
+					useTimeSeconds,
+					common.GetContextKeyBool(c, constant.ContextKeyIsStream),
+					userGroup,
+					other,
+				)
+			}
+
 			return
 		}
 	}

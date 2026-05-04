@@ -168,6 +168,8 @@ func GetStatus(c *gin.Context) {
 		"user_agreement_enabled":      legalSetting.UserAgreement != "",
 		"privacy_policy_enabled":      legalSetting.PrivacyPolicy != "",
 		"checkin_enabled":             operation_setting.GetCheckinSetting().Enabled,
+		"monitoring_script_enabled":   common.OptionMap["MonitoringScriptEnabled"] == "true",
+		"monitoring_script_path":      common.OptionMap["MonitoringScriptPath"],
 	}
 
 	// 根据启用状态注入可选内容

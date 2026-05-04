@@ -57,25 +57,27 @@ type UserRequestRiskSummary struct {
 }
 
 type UserRiskLogItem struct {
-	Id                      int    `json:"id"`
-	CreatedAt               int64  `json:"created_at"`
-	StatusCode              int    `json:"status_code"`
-	ErrorCode               string `json:"error_code"`
-	Content                 string `json:"content"`
-	ModelName               string `json:"model_name"`
-	TokenName               string `json:"token_name"`
-	Quota                   int    `json:"quota"`
-	UseTime                 int    `json:"use_time"`
-	IsStream                bool   `json:"is_stream"`
-	ChannelId               int    `json:"channel_id"`
-	ChannelName             string `json:"channel_name"`
-	Ip                      string `json:"ip"`
-	RequestId               string `json:"request_id"`
-	Group                   string `json:"group"`
-	RequestPreview          string `json:"request_preview"`
-	RequestPreviewTruncated bool   `json:"request_preview_truncated"`
-	RequestBodySize         int64  `json:"request_body_size"`
-	RequestContentType      string `json:"request_content_type"`
+	Id                      int      `json:"id"`
+	CreatedAt               int64    `json:"created_at"`
+	StatusCode              int      `json:"status_code"`
+	ErrorCode               string   `json:"error_code"`
+	RejectReason            string   `json:"reject_reason"`
+	MatchedWords            []string `json:"matched_words"`
+	Content                 string   `json:"content"`
+	ModelName               string   `json:"model_name"`
+	TokenName               string   `json:"token_name"`
+	Quota                   int      `json:"quota"`
+	UseTime                 int      `json:"use_time"`
+	IsStream                bool     `json:"is_stream"`
+	ChannelId               int      `json:"channel_id"`
+	ChannelName             string   `json:"channel_name"`
+	Ip                      string   `json:"ip"`
+	RequestId               string   `json:"request_id"`
+	Group                   string   `json:"group"`
+	RequestPreview          string   `json:"request_preview"`
+	RequestPreviewTruncated bool     `json:"request_preview_truncated"`
+	RequestBodySize         int64    `json:"request_body_size"`
+	RequestContentType      string   `json:"request_content_type"`
 }
 
 // don't use iota, avoid change log type value
@@ -798,6 +800,19 @@ func GetUserRiskLogs(userId int, days int, startIdx int, num int) ([]*UserRiskLo
 			}
 			if contentType, ok := otherMap["request_content_type"].(string); ok {
 				item.RequestContentType = contentType
+			}
+			if rejectReason, ok := otherMap["reject_reason"].(string); ok {
+				item.RejectReason = rejectReason
+			}
+			if adminInfo, ok := otherMap["admin_info"].(map[string]interface{}); ok {
+				if matchedWords, ok := adminInfo["matched_words"].([]interface{}); ok {
+					item.MatchedWords = make([]string, 0, len(matchedWords))
+					for _, word := range matchedWords {
+						if text, ok := word.(string); ok && text != "" {
+							item.MatchedWords = append(item.MatchedWords, text)
+						}
+					}
+				}
 			}
 		}
 		if log.ChannelId != 0 {

@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React, { lazy, Suspense, useContext, useMemo } from 'react';
+import React, { lazy, Suspense, useContext, useEffect, useMemo } from 'react';
 import { Route, Routes, useLocation, useParams } from 'react-router-dom';
 import Loading from './components/common/ui/Loading';
 import User from './pages/User';
@@ -65,6 +65,46 @@ function DynamicOAuth2Callback() {
 function App() {
   const location = useLocation();
   const [statusState] = useContext(StatusContext);
+
+  useEffect(() => {
+    const scriptId = 'custom-monitoring-script';
+    const enabled = statusState?.status?.monitoring_script_enabled === true;
+    const scriptPath = (statusState?.status?.monitoring_script_path || '').trim();
+    const existingScript = document.getElementById(scriptId);
+
+    if (!enabled || !scriptPath) {
+      if (existingScript) {
+        existingScript.remove();
+      }
+      return;
+    }
+
+    if (existingScript && existingScript.getAttribute('src') === scriptPath) {
+      return;
+    }
+
+    if (existingScript) {
+      existingScript.remove();
+    }
+
+    const script = document.createElement('script');
+    script.id = scriptId;
+    script.src = scriptPath;
+    script.async = true;
+    script.defer = true;
+    script.setAttribute('data-monitoring-script', 'true');
+    document.head.appendChild(script);
+
+    return () => {
+      const mountedScript = document.getElementById(scriptId);
+      if (mountedScript && mountedScript.getAttribute('src') === scriptPath) {
+        mountedScript.remove();
+      }
+    };
+  }, [
+    statusState?.status?.monitoring_script_enabled,
+    statusState?.status?.monitoring_script_path,
+  ]);
 
   // 获取模型广场权限配置
   const pricingRequireAuth = useMemo(() => {

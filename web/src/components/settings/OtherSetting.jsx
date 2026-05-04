@@ -27,6 +27,7 @@ import {
   Modal,
   Space,
   Card,
+  Checkbox,
 } from '@douyinfe/semi-ui';
 import { API, showError, showSuccess, timestamp2string } from '../../helpers';
 import { marked } from 'marked';
@@ -48,6 +49,8 @@ const OtherSetting = () => {
     Footer: '',
     About: '',
     HomePageContent: '',
+    MonitoringScriptEnabled: false,
+    MonitoringScriptPath: '',
   });
   let [loading, setLoading] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
@@ -81,11 +84,16 @@ const OtherSetting = () => {
     HomePageContent: false,
     About: false,
     Footer: false,
+    MonitoringScript: false,
     CheckUpdate: false,
   });
   const handleInputChange = async (value, e) => {
     const name = e.target.id;
     setInputs((inputs) => ({ ...inputs, [name]: value }));
+  };
+
+  const handleCheckboxChange = (name, checked) => {
+    setInputs((inputs) => ({ ...inputs, [name]: checked }));
   };
 
   // 通用设置
@@ -228,6 +236,32 @@ const OtherSetting = () => {
     }
   };
 
+  const submitMonitoringScript = async () => {
+    try {
+      setLoadingInput((loadingInput) => ({
+        ...loadingInput,
+        MonitoringScript: true,
+      }));
+      await updateOption(
+        'MonitoringScriptEnabled',
+        !!inputs.MonitoringScriptEnabled,
+      );
+      await updateOption(
+        'MonitoringScriptPath',
+        (inputs.MonitoringScriptPath || '').trim(),
+      );
+      showSuccess(t('监测脚本设置已更新'));
+    } catch (error) {
+      console.error(t('监测脚本设置更新失败'), error);
+      showError(t('监测脚本设置更新失败'));
+    } finally {
+      setLoadingInput((loadingInput) => ({
+        ...loadingInput,
+        MonitoringScript: false,
+      }));
+    }
+  };
+
   const checkUpdate = async () => {
     try {
       setLoadingInput((loadingInput) => ({
@@ -285,7 +319,11 @@ const OtherSetting = () => {
       let newInputs = {};
       data.forEach((item) => {
         if (item.key in inputs) {
-          newInputs[item.key] = item.value;
+          if (item.key === 'MonitoringScriptEnabled') {
+            newInputs[item.key] = item.value === 'true';
+          } else {
+            newInputs[item.key] = item.value;
+          }
         }
       });
       setInputs(newInputs);
@@ -493,6 +531,41 @@ const OtherSetting = () => {
               />
               <Button onClick={submitFooter} loading={loadingInput['Footer']}>
                 {t('设置页脚')}
+              </Button>
+
+              <Banner
+                fullMode={false}
+                type='info'
+                description={t(
+                  '可按同域名路径动态加载监测脚本，例如 /monitoring/agent.js。开启后前端会在全局自动插入 script 标签加载该路径。',
+                )}
+                closeIcon={null}
+                style={{ marginTop: 15 }}
+              />
+              <div style={{ marginTop: 12, marginBottom: 12 }}>
+                <Checkbox
+                  checked={!!inputs.MonitoringScriptEnabled}
+                  onChange={(e) =>
+                    handleCheckboxChange(
+                      'MonitoringScriptEnabled',
+                      e.target.checked,
+                    )
+                  }
+                >
+                  {t('启用监测脚本')}
+                </Checkbox>
+              </div>
+              <Form.Input
+                label={t('监测脚本路径')}
+                placeholder={t('例如 /monitoring/agent.js')}
+                field={'MonitoringScriptPath'}
+                onChange={handleInputChange}
+              />
+              <Button
+                onClick={submitMonitoringScript}
+                loading={loadingInput['MonitoringScript']}
+              >
+                {t('保存监测脚本设置')}
               </Button>
             </Form.Section>
           </Card>
