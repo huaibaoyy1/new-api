@@ -418,20 +418,29 @@ const GoldenPoker = () => {
                 {t('筹码入场')}
               </Title>
               <Paragraph style={mutedText}>
-                {t('单局最高派奖 100 站内余额。')}
+                {t('单局最高派奖')} {formatAmount(status?.max_payout || 50)} {t('站内余额')}。
               </Paragraph>
               <div className='grid grid-cols-3 gap-3'>
                 {(status?.bet_amounts || [1, 5, 10]).map((amount) => (
                   <button
                     key={amount}
-                    className={`rounded-full border px-4 py-3 text-center font-black transition ${
+                    className={`group relative overflow-hidden rounded-2xl border px-3 py-3 text-center transition ${
                       selectedBet === amount
-                        ? 'border-amber-100 bg-amber-300 text-[#241005] shadow-lg shadow-amber-900/30'
-                        : 'border-amber-200/50 bg-white/10 text-amber-50 hover:bg-white/20'
+                        ? 'border-amber-100 bg-[linear-gradient(135deg,#fff7d6_0%,#f59e0b_100%)] text-[#2b1203] shadow-lg shadow-amber-900/30'
+                        : 'border-amber-300/70 bg-[#4a210c] text-amber-50 shadow-inner shadow-black/25 hover:border-amber-100 hover:bg-[#66320f]'
                     }`}
                     onClick={() => setSelectedBet(amount)}
                   >
-                    {amount}
+                    <span className='block text-2xl font-black leading-none tracking-tight'>
+                      {amount}
+                    </span>
+                    <span
+                      className={`mt-1 block text-[11px] font-bold ${
+                        selectedBet === amount ? 'text-[#5b2505]' : 'text-amber-100'
+                      }`}
+                    >
+                      {t('站内余额')}
+                    </span>
                   </button>
                 ))}
               </div>

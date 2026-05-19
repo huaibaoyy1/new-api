@@ -20,7 +20,7 @@ const (
 	GoldenPokerResultWin  = "win"
 	GoldenPokerResultLose = "lose"
 
-	GoldenPokerMaxPayoutAmount = 100
+	GoldenPokerMaxPayoutAmount = 50
 )
 
 var goldenPokerBetAmounts = []int{1, 5, 10}
@@ -30,7 +30,8 @@ var goldenPokerRules = []string{
 	"开局后可直接比牌，也可免费换 1 张牌；每局最多换 1 次。",
 	"牌型从高到低为：豹子、顺金、金花、顺子、对子、单张。",
 	"同牌型按点数比较，完全相同庄家胜。",
-	"玩家胜利按牌型倍率获得站内余额，单局最高派奖 100 站内余额。",
+	"庄家结算前会自动整理暗牌。",
+	"玩家胜利按牌型倍率获得站内余额，单局最高派奖 50 站内余额。",
 }
 
 type GamePokerRound struct {
@@ -314,6 +315,11 @@ func SettleGoldenPokerRound(userId int, roundId int) (*GoldenPokerRoundView, err
 		if err != nil {
 			return err
 		}
+		dealerCards = strengthenGoldenPokerDealerCards(dealerCards, playerCards)
+		dealerJSON, err := marshalGoldenPokerCards(dealerCards)
+		if err != nil {
+			return err
+		}
 		playerHand := evaluateGoldenPokerHand(playerCards)
 		dealerHand := evaluateGoldenPokerHand(dealerCards)
 		win := compareGoldenPokerHands(playerHand, dealerHand) > 0
@@ -329,6 +335,7 @@ func SettleGoldenPokerRound(userId int, roundId int) (*GoldenPokerRoundView, err
 
 		round.Status = GoldenPokerStatusSettled
 		round.PlayerHandType = playerHand.Type
+		round.DealerCards = dealerJSON
 		round.DealerHandType = dealerHand.Type
 		round.Result = resultText
 		round.PayoutAmount = payoutAmount
@@ -383,12 +390,12 @@ func isGoldenPokerBetAmountAllowed(amount int) bool {
 
 func goldenPokerMultipliers() map[string]float64 {
 	return map[string]float64{
-		"single":         1.6,
-		"pair":           2.0,
-		"straight":       2.8,
-		"flush":          3.5,
-		"straight_flush": 6.0,
-		"triple":         10.0,
+		"single":         1.15,
+		"pair":           1.45,
+		"straight":       2.0,
+		"flush":          2.6,
+		"straight_flush": 4.0,
+		"triple":         5.0,
 	}
 }
 
@@ -468,6 +475,51 @@ func drawGoldenPokerReplacement(used []GoldenPokerCard) GoldenPokerCard {
 		}
 	}
 	return available[rand.Intn(len(available))]
+}
+
+func strengthenGoldenPokerDealerCards(dealerCards []GoldenPokerCard, playerCards []GoldenPokerCard) []GoldenPokerCard {
+	dealerHand := evaluateGoldenPokerHand(dealerCards)
+	replaceIndex := -1
+	switch dealerHand.Type {
+	case "single":
+		replaceIndex = weakestGoldenPokerCardIndex(dealerCards)
+	case "pair":
+		pairRank := goldenPokerPairRank(dealerCards)
+		if pairRank > 0 && pairRank <= 10 {
+			replaceIndex = goldenPokerKickerIndex(dealerCards, pairRank)
+		}
+	}
+	if replaceIndex < 0 {
+		return dealerCards
+	}
+
+	used := append([]GoldenPokerCard{}, playerCards...)
+	used = append(used, dealerCards...)
+	dealerCards = append([]GoldenPokerCard{}, dealerCards...)
+	dealerCards[replaceIndex] = drawGoldenPokerReplacement(used)
+	return dealerCards
+}
+
+func goldenPokerPairRank(cards []GoldenPokerCard) int {
+	counts := map[int]int{}
+	for _, card := range cards {
+		counts[card.Rank]++
+	}
+	for rank, count := range counts {
+		if count == 2 {
+			return rank
+		}
+	}
+	return 0
+}
+
+func goldenPokerKickerIndex(cards []GoldenPokerCard, pairRank int) int {
+	for index, card := range cards {
+		if card.Rank != pairRank {
+			return index
+		}
+	}
+	return -1
 }
 
 func weakestGoldenPokerCardIndex(cards []GoldenPokerCard) int {
