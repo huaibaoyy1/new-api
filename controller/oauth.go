@@ -210,6 +210,7 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 	providerName := c.Param("provider")
 	invitationCode := ""
 	requireInvitationCode := common.InvitationCodeEnabled && providerName == "linuxdo"
+	isOpenRegistration := false
 
 	// Check if user already exists with new ID
 	if provider.IsUserIDTaken(oauthUser.ProviderUserID) {
@@ -290,10 +291,21 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 		if invitationCode == "" {
 			return nil, fmt.Errorf("邀请码不能为空")
 		}
-		if _, err := model.ValidateInvitationCode(invitationCode); err != nil {
-			return nil, err
+		isOpenRegistration = model.IsOpenRegistrationInviteCode(invitationCode)
+		if !isOpenRegistration {
+			if _, err := model.ValidateInvitationCode(invitationCode); err != nil {
+				return nil, err
+			}
+		} else {
+			inviterId = 0
+			user.InviterId = 0
+			user.FormalStatus = model.UserFormalStatusProbation
+			user.ProbationStartedAt = 0
+			user.ProbationCheckinDays = 0
 		}
 	}
+
+	consumeInvitationCode := requireInvitationCode && !isOpenRegistration
 
 	// Use transaction to ensure user creation and OAuth binding are atomic
 	if genericProvider, ok := provider.(*oauth.GenericOAuthProvider); ok {
@@ -303,7 +315,7 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 			if err := user.InsertWithTx(tx, inviterId); err != nil {
 				return err
 			}
-			if requireInvitationCode {
+			if consumeInvitationCode {
 				if err := model.ConsumeInvitationCodeWithTx(tx, invitationCode, user.Id); err != nil {
 					return err
 				}
@@ -338,7 +350,7 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 			if err := user.InsertWithTx(tx, inviterId); err != nil {
 				return err
 			}
-			if requireInvitationCode {
+			if consumeInvitationCode {
 				if err := model.ConsumeInvitationCodeWithTx(tx, invitationCode, user.Id); err != nil {
 					return err
 				}
