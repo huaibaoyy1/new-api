@@ -202,6 +202,16 @@ func ValidateInvitationCode(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	if model.IsOpenRegistrationInviteCode(req.Code) {
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "",
+			"data": gin.H{
+				"valid": true,
+			},
+		})
+		return
+	}
 	if !common.InvitationCodeEnabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,

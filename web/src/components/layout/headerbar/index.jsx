@@ -41,8 +41,10 @@ const HeaderBar = ({ onMobileMenuToggle, drawerOpen }) => {
     isNewYear,
     isSelfUseMode,
     docsLink,
+    gamesEnabled,
     isDemoSiteMode,
     isConsoleRoute,
+    isGameRoute,
     theme,
     headerNavModules,
     pricingRequireAuth,
@@ -56,22 +58,34 @@ const HeaderBar = ({ onMobileMenuToggle, drawerOpen }) => {
 
   const {
     noticeVisible,
+    forceNotice,
     unreadCount,
     handleNoticeOpen,
     handleNoticeClose,
     getUnreadKeys,
-  } = useNotifications(statusState);
+  } = useNotifications(statusState, userState);
 
-  const { mainNavLinks } = useNavigation(t, docsLink, headerNavModules);
+  const { mainNavLinks } = useNavigation(
+    t,
+    docsLink,
+    headerNavModules,
+    gamesEnabled,
+  );
+
+  const headerClassName = isGameRoute
+    ? 'text-slate-950 sticky top-0 z-50 transition-colors duration-300 bg-white/95 border-b border-slate-200 shadow-sm backdrop-blur-lg'
+    : 'text-semi-color-text-0 sticky top-0 z-50 transition-colors duration-300 bg-white/75 dark:bg-zinc-900/75 backdrop-blur-lg';
 
   return (
-    <header className='text-semi-color-text-0 sticky top-0 z-50 transition-colors duration-300 bg-white/75 dark:bg-zinc-900/75 backdrop-blur-lg'>
+    <header className={headerClassName}>
       <NoticeModal
         visible={noticeVisible}
         onClose={handleNoticeClose}
         isMobile={isMobile}
         defaultTab={unreadCount > 0 ? 'system' : 'inApp'}
         unreadKeys={getUnreadKeys()}
+        forceClose={forceNotice}
+        requireConfirmation={forceNotice}
       />
 
       <div className='w-full px-2'>
@@ -95,6 +109,7 @@ const HeaderBar = ({ onMobileMenuToggle, drawerOpen }) => {
               systemName={systemName}
               isSelfUseMode={isSelfUseMode}
               isDemoSiteMode={isDemoSiteMode}
+              isGameRoute={isGameRoute}
               t={t}
             />
           </div>
@@ -121,6 +136,7 @@ const HeaderBar = ({ onMobileMenuToggle, drawerOpen }) => {
             isSelfUseMode={isSelfUseMode}
             logout={logout}
             navigate={navigate}
+            isGameRoute={isGameRoute}
             t={t}
           />
         </div>

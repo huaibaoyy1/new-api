@@ -48,6 +48,288 @@ body {
   height: calc(100dvh - 64px);
 }
 
+.game-layout-header,
+.game-layout-header header {
+  background: #fff !important;
+  color: #0f172a !important;
+}
+
+.game-layout-header .semi-button,
+.game-layout-header .semi-button-content,
+.game-layout-header .semi-icon,
+.game-layout-header svg,
+.game-layout-header span,
+.game-layout-header a {
+  color: #0f172a !important;
+}
+
+.game-layout-header .semi-button {
+  background: #f1f5f9 !important;
+}
+
+.game-layout-header .semi-button:hover,
+.game-layout-header .semi-button:focus {
+  background: #e2e8f0 !important;
+}
+
+.treasure-layer-success {
+  position: relative;
+  overflow: hidden;
+  animation: treasure-success-pop 900ms ease-out both,
+    treasure-success-glow 2.4s ease-in-out infinite;
+}
+
+.treasure-layer-success::after {
+  content: '';
+  position: absolute;
+  inset: -40%;
+  background: linear-gradient(
+    120deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.78) 50%,
+    transparent 65%
+  );
+  transform: translateX(-120%) rotate(12deg);
+  animation: treasure-success-sweep 1.6s ease-out both;
+  pointer-events: none;
+}
+
+@keyframes treasure-success-pop {
+  0% {
+    transform: translateY(0);
+  }
+  55% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes treasure-success-glow {
+  0%,
+  100% {
+    box-shadow: 0 12px 26px rgba(8, 145, 178, 0.18);
+  }
+  50% {
+    box-shadow: 0 18px 38px rgba(8, 145, 178, 0.34);
+  }
+}
+
+@keyframes treasure-success-sweep {
+  to {
+    transform: translateX(120%) rotate(12deg);
+  }
+}
+
+.magic-cube-board-spin .magic-cube-prize-cell {
+  animation: magic-cube-prize-pulse 900ms ease-in-out both;
+}
+
+.magic-cube-board-spin .magic-cube-prize-cell:nth-child(1) {
+  animation-delay: 0ms;
+}
+
+.magic-cube-board-spin .magic-cube-prize-cell:nth-child(2) {
+  animation-delay: 90ms;
+}
+
+.magic-cube-board-spin .magic-cube-prize-cell:nth-child(3) {
+  animation-delay: 180ms;
+}
+
+.magic-cube-board-spin .magic-cube-prize-cell:nth-child(4) {
+  animation-delay: 270ms;
+}
+
+.magic-cube-board-spin .magic-cube-prize-cell:nth-child(6) {
+  animation-delay: 360ms;
+}
+
+.magic-cube-board-spin .magic-cube-prize-cell:nth-child(7) {
+  animation-delay: 450ms;
+}
+
+.magic-cube-board-spin .magic-cube-prize-cell:nth-child(8) {
+  animation-delay: 540ms;
+}
+
+.magic-cube-board-spin .magic-cube-prize-cell:nth-child(9) {
+  animation-delay: 630ms;
+}
+
+.magic-cube-win-pop {
+  animation: magic-cube-win-pop 520ms cubic-bezier(0.2, 0.9, 0.24, 1.18)
+    both;
+}
+
+.magic-cube-prize-win {
+  animation: magic-cube-prize-win 1.25s ease-in-out both;
+  border-color: #f97316 !important;
+  background: linear-gradient(135deg, #fff7ad 0%, #ffd166 100%) !important;
+}
+
+@keyframes magic-cube-prize-pulse {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+    box-shadow: inset 0 0 0 rgba(255, 255, 255, 0), 0 0 0 rgba(250, 204, 21, 0);
+  }
+  45% {
+    transform: translateY(-5px) scale(1.04);
+    box-shadow: inset 0 0 18px rgba(255, 255, 255, 0.68), 0 0 24px rgba(250, 204, 21, 0.54);
+  }
+}
+
+@keyframes magic-cube-prize-win {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+    box-shadow:
+      inset 0 0 18px rgba(255, 255, 255, 0.62),
+      0 0 0 rgba(249, 115, 22, 0);
+  }
+  35%,
+  72% {
+    transform: translateY(-6px) scale(1.06);
+    box-shadow:
+      inset 0 0 24px rgba(255, 255, 255, 0.9),
+      0 0 34px rgba(249, 115, 22, 0.72);
+  }
+}
+
+@keyframes magic-cube-win-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.78) rotate(-2deg);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.08) rotate(1deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+.golden-poker-card-deal {
+  animation: golden-poker-deal 640ms cubic-bezier(0.2, 0.85, 0.2, 1.15) both;
+  transform-origin: 50% 120%;
+}
+
+.golden-poker-card-reveal {
+  animation: golden-poker-reveal 760ms cubic-bezier(0.2, 0.85, 0.2, 1) both;
+  transform-origin: center;
+}
+
+.golden-poker-card-back {
+  animation: golden-poker-back-float 2.8s ease-in-out infinite;
+}
+
+.golden-poker-card-back::after,
+.golden-poker-card-deal::after,
+.golden-poker-card-reveal::after {
+  content: '';
+  position: absolute;
+  inset: -45%;
+  background: linear-gradient(
+    120deg,
+    transparent 36%,
+    rgba(255, 255, 255, 0.62) 50%,
+    transparent 64%
+  );
+  transform: translateX(-130%) rotate(14deg);
+  animation: golden-poker-card-shine 1.35s ease-out both;
+  pointer-events: none;
+}
+
+.golden-poker-card-back::before {
+  content: '';
+  position: absolute;
+  inset: 10px;
+  border: 1px solid rgba(254, 243, 199, 0.55);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(254, 243, 199, 0.34), transparent 34%),
+    linear-gradient(135deg, transparent 45%, rgba(254, 243, 199, 0.28) 46%, transparent 54%);
+}
+
+.golden-poker-result-pill {
+  animation: golden-poker-result-pop 520ms cubic-bezier(0.2, 0.9, 0.24, 1.18)
+    both;
+}
+
+@keyframes golden-poker-deal {
+  0% {
+    opacity: 0;
+    transform: translate3d(72px, -80px, 0) rotate(16deg) scale(0.82);
+  }
+  62% {
+    opacity: 1;
+    transform: translate3d(-4px, 4px, 0) rotate(-3deg) scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0) scale(1);
+  }
+}
+
+@keyframes golden-poker-reveal {
+  0% {
+    opacity: 0;
+    transform: perspective(700px) rotateY(88deg) translateY(-10px) scale(0.96);
+    filter: brightness(1.3);
+  }
+  55% {
+    opacity: 1;
+    transform: perspective(700px) rotateY(-10deg) translateY(0) scale(1.04);
+    filter: brightness(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(700px) rotateY(0) translateY(0) scale(1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes golden-poker-back-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-0.6deg);
+  }
+  50% {
+    transform: translateY(-4px) rotate(0.6deg);
+  }
+}
+
+@keyframes golden-poker-card-shine {
+  0% {
+    transform: translateX(-130%) rotate(14deg);
+  }
+  100% {
+    transform: translateX(130%) rotate(14deg);
+  }
+}
+
+@keyframes golden-poker-result-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+body.game-route-active > #root > .semi-layout > .semi-layout-header {
+  background: #fff !important;
+  color: #0f172a !important;
+  border-bottom: none !important;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08) !important;
+}
+
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;

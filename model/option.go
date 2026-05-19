@@ -45,6 +45,8 @@ func InitOptionMap() {
 	common.OptionMap["TurnstileCheckEnabled"] = strconv.FormatBool(common.TurnstileCheckEnabled)
 	common.OptionMap["RegisterEnabled"] = strconv.FormatBool(common.RegisterEnabled)
 	common.OptionMap["InvitationCodeEnabled"] = strconv.FormatBool(common.InvitationCodeEnabled)
+	common.OptionMap["OpenRegistrationInviteEnabled"] = strconv.FormatBool(common.OpenRegistrationInviteEnabled)
+	common.OptionMap["OpenRegistrationInviteCode"] = common.OpenRegistrationInviteCode
 	common.OptionMap["AutomaticDisableChannelEnabled"] = strconv.FormatBool(common.AutomaticDisableChannelEnabled)
 	common.OptionMap["AutomaticEnableChannelEnabled"] = strconv.FormatBool(common.AutomaticEnableChannelEnabled)
 	common.OptionMap["AutomaticDisableUserEnabled"] = strconv.FormatBool(common.AutomaticDisableUserEnabled)
@@ -276,6 +278,8 @@ func updateOptionMap(key string, value string) (err error) {
 			common.RegisterEnabled = boolValue
 		case "InvitationCodeEnabled":
 			common.InvitationCodeEnabled = boolValue
+		case "OpenRegistrationInviteEnabled":
+			common.OpenRegistrationInviteEnabled = boolValue
 		case "EmailDomainRestrictionEnabled":
 			common.EmailDomainRestrictionEnabled = boolValue
 		case "EmailAliasRestrictionEnabled":
@@ -488,6 +492,8 @@ func updateOptionMap(key string, value string) (err error) {
 		common.TurnstileSecretKey = value
 	case "QuotaForNewUser":
 		common.QuotaForNewUser, _ = strconv.Atoi(value)
+	case "OpenRegistrationInviteCode":
+		common.OpenRegistrationInviteCode = strings.TrimSpace(value)
 	case "QuotaForInviter":
 		common.QuotaForInviter, _ = strconv.Atoi(value)
 	case "QuotaForInvitee":

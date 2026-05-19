@@ -67,17 +67,26 @@ func GetCheckinStatus(c *gin.Context) {
 		})
 		return
 	}
+	probationProgress, err := model.GetUserProbationProgressById(userId)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
 
 	nonceDate := time.Now().Format("2006-01-02")
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
-			"enabled":      setting.Enabled,
-			"min_quota":    setting.MinQuota,
-			"max_quota":    setting.MaxQuota,
-			"stats":        stats,
+			"enabled":       setting.Enabled,
+			"min_quota":     setting.MinQuota,
+			"max_quota":     setting.MaxQuota,
+			"stats":         stats,
+			"probation":     probationProgress,
 			"checkin_nonce": generateDailyCheckinNonce(userId, nonceDate),
-			"nonce_date":   nonceDate,
+			"nonce_date":    nonceDate,
 		},
 	})
 }
@@ -107,12 +116,14 @@ func DoCheckin(c *gin.Context) {
 		})
 		return
 	}
+	probationProgress, _ := model.GetUserProbationProgressById(userId)
 	model.RecordLog(userId, model.LogTypeSystem, fmt.Sprintf("用户签到，获得额度 %s", logger.LogQuota(checkin.QuotaAwarded)))
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "签到成功",
 		"data": gin.H{
 			"quota_awarded": checkin.QuotaAwarded,
-			"checkin_date":  checkin.CheckinDate},
+			"checkin_date":  checkin.CheckinDate,
+			"probation":     probationProgress},
 	})
 }

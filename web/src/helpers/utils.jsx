@@ -40,10 +40,15 @@ export function isAdmin() {
 }
 
 export function isRoot() {
-  let user = localStorage.getItem('user');
-  if (!user) return false;
-  user = JSON.parse(user);
-  return user.role >= 100;
+	let user = localStorage.getItem('user');
+	if (!user) return false;
+	user = JSON.parse(user);
+	return user.role >= 100;
+}
+
+export function isFormalUser(user) {
+	if (!user) return true;
+	return Number(user.formal_status || 1) === 1;
 }
 
 export function getSystemName() {

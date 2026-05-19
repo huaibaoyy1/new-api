@@ -82,6 +82,10 @@ const CheckinCalendar = ({ t, status, turnstileEnabled, turnstileSiteKey }) => {
       0,
     );
   }, [checkinData.stats?.records]);
+  const probation = checkinData.probation || {};
+  const isFormal = probation.is_formal !== false;
+  const probationDays = probation.probation_checkin_days || 0;
+  const probationTarget = probation.probation_checkin_target || 5;
 
   // 获取签到状态
   const fetchCheckinStatus = async (month) => {
@@ -362,6 +366,20 @@ const CheckinCalendar = ({ t, status, turnstileEnabled, turnstileSiteKey }) => {
         </div>
 
         {/* 签到日历 - 使用更紧凑的样式 */}
+        {!isFormal && (
+          <div className='mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg'>
+            <div className='flex items-center justify-between gap-3'>
+              <Typography.Text strong>{t('转正进度')}</Typography.Text>
+              <Typography.Text type='warning' strong>
+                {probationDays}/{probationTarget}
+              </Typography.Text>
+            </div>
+            <Typography.Text type='tertiary' size='small'>
+              {t('7 天内签到 5 天后即可成为正式用户，转正前仅可使用签到功能')}
+            </Typography.Text>
+          </div>
+        )}
+
         <Spin spinning={loading}>
           <div className='border rounded-lg overflow-hidden checkin-calendar'>
             <style>{`

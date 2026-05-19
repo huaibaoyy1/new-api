@@ -174,12 +174,14 @@ func Register(c *gin.Context) {
 			return
 		}
 	}
-	if common.InvitationCodeEnabled {
-		if strings.TrimSpace(req.InvitationCode) == "" {
+	invitationCode := strings.TrimSpace(req.InvitationCode)
+	isOpenRegistration := model.IsOpenRegistrationInviteCode(invitationCode)
+	if common.InvitationCodeEnabled && !isOpenRegistration {
+		if invitationCode == "" {
 			common.ApiError(c, errors.New("邀请码不能为空"))
 			return
 		}
-		if _, err := model.ValidateInvitationCode(strings.TrimSpace(req.InvitationCode)); err != nil {
+		if _, err := model.ValidateInvitationCode(invitationCode); err != nil {
 			common.ApiError(c, err)
 			return
 		}
@@ -203,6 +205,13 @@ func Register(c *gin.Context) {
 		InviterId:   inviterId,
 		Role:        common.RoleCommonUser, // 明确设置角色为普通用户
 	}
+	if isOpenRegistration {
+		cleanUser.InviterId = 0
+		cleanUser.FormalStatus = model.UserFormalStatusProbation
+		cleanUser.ProbationStartedAt = 0
+		cleanUser.ProbationCheckinDays = 0
+		inviterId = 0
+	}
 	if common.EmailVerificationEnabled {
 		cleanUser.Email = req.Email
 	}
@@ -217,15 +226,15 @@ func Register(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgUserRegisterFailed)
 		return
 	}
-	if common.InvitationCodeEnabled {
-		if err := model.ConsumeInvitationCode(strings.TrimSpace(req.InvitationCode), insertedUser.Id); err != nil {
+	if common.InvitationCodeEnabled && !isOpenRegistration {
+		if err := model.ConsumeInvitationCode(invitationCode, insertedUser.Id); err != nil {
 			_ = model.HardDeleteUserById(insertedUser.Id)
 			common.ApiError(c, err)
 			return
 		}
 	}
 	// 生成默认令牌
-	if constant.GenerateDefaultToken {
+	if constant.GenerateDefaultToken && !isOpenRegistration {
 		key, err := common.GenerateKey()
 		if err != nil {
 			common.ApiErrorI18n(c, i18n.MsgUserDefaultTokenFailed)
@@ -297,6 +306,8 @@ func SearchUsers(c *gin.Context) {
 
 func modelUserActivityFilterFromRequest(c *gin.Context, days int) model.UserActivityFilter {
 	userStatus, _ := strconv.Atoi(c.DefaultQuery("user_status", "0"))
+	formalStatus, _ := strconv.Atoi(c.DefaultQuery("formal_status", "0"))
+	minBanCount, _ := strconv.Atoi(c.DefaultQuery("min_ban_count", "0"))
 	minErrorRate, _ := strconv.ParseFloat(c.DefaultQuery("min_error_rate", "0"), 64)
 	minStatus429, _ := strconv.Atoi(c.DefaultQuery("min_status_429", "0"))
 
@@ -305,6 +316,8 @@ func modelUserActivityFilterFromRequest(c *gin.Context, days int) model.UserActi
 		ConsumeStatus: c.DefaultQuery("consume_status", "all"),
 		CheckinStatus: c.DefaultQuery("checkin_status", "all"),
 		UserStatus:    userStatus,
+		FormalStatus:  formalStatus,
+		MinBanCount:   minBanCount,
 		RiskLevel:     c.DefaultQuery("risk_level", "all"),
 		MinErrorRate:  minErrorRate,
 		MinStatus429:  minStatus429,
@@ -360,6 +373,7 @@ func ExportUserActivityCSV(c *gin.Context) {
 		"最后登录时间",
 		"最后登录IP",
 	}
+	header = append(header, "正式状态", "封禁次数")
 	if err := writer.Write(header); err != nil {
 		common.ApiError(c, err)
 		return
@@ -384,6 +398,12 @@ func ExportUserActivityCSV(c *gin.Context) {
 		default:
 			return "未知"
 		}
+	}
+	formalStatusText := func(status int) string {
+		if status == model.UserFormalStatusProbation {
+			return "非正式"
+		}
+		return "正式"
 	}
 	boolText := func(v bool) string {
 		if v {
@@ -416,6 +436,7 @@ func ExportUserActivityCSV(c *gin.Context) {
 			formatTS(user.LastLoginAt),
 			user.LastLoginIP,
 		}
+		record = append(record, formalStatusText(user.GetFormalStatus()), strconv.Itoa(user.BanCount))
 		if err := writer.Write(record); err != nil {
 			common.ApiError(c, err)
 			return
@@ -583,31 +604,36 @@ func GetSelf(c *gin.Context) {
 
 	// 构建响应数据，包含用户信息和权限
 	responseData := map[string]interface{}{
-		"id":                user.Id,
-		"username":          user.Username,
-		"display_name":      user.DisplayName,
-		"role":              user.Role,
-		"status":            user.Status,
-		"email":             user.Email,
-		"github_id":         user.GitHubId,
-		"discord_id":        user.DiscordId,
-		"oidc_id":           user.OidcId,
-		"wechat_id":         user.WeChatId,
-		"telegram_id":       user.TelegramId,
-		"group":             user.Group,
-		"quota":             user.Quota,
-		"used_quota":        user.UsedQuota,
-		"request_count":     user.RequestCount,
-		"aff_code":          user.AffCode,
-		"aff_count":         user.AffCount,
-		"aff_quota":         user.AffQuota,
-		"aff_history_quota": user.AffHistoryQuota,
-		"inviter_id":        user.InviterId,
-		"linux_do_id":       user.LinuxDOId,
-		"setting":           user.Setting,
-		"stripe_customer":   user.StripeCustomer,
-		"sidebar_modules":   userSetting.SidebarModules, // 正确提取sidebar_modules字段
-		"permissions":       permissions,                // 新增权限字段
+		"id":                     user.Id,
+		"username":               user.Username,
+		"display_name":           user.DisplayName,
+		"role":                   user.Role,
+		"status":                 user.Status,
+		"ban_count":              user.BanCount,
+		"formal_status":          user.GetFormalStatus(),
+		"probation_started_at":   user.ProbationStartedAt,
+		"probation_checkin_days": user.ProbationCheckinDays,
+		"probation":              model.GetUserProbationProgress(user),
+		"email":                  user.Email,
+		"github_id":              user.GitHubId,
+		"discord_id":             user.DiscordId,
+		"oidc_id":                user.OidcId,
+		"wechat_id":              user.WeChatId,
+		"telegram_id":            user.TelegramId,
+		"group":                  user.Group,
+		"quota":                  user.Quota,
+		"used_quota":             user.UsedQuota,
+		"request_count":          user.RequestCount,
+		"aff_code":               user.AffCode,
+		"aff_count":              user.AffCount,
+		"aff_quota":              user.AffQuota,
+		"aff_history_quota":      user.AffHistoryQuota,
+		"inviter_id":             user.InviterId,
+		"linux_do_id":            user.LinuxDOId,
+		"setting":                user.Setting,
+		"stripe_customer":        user.StripeCustomer,
+		"sidebar_modules":        userSetting.SidebarModules, // 正确提取sidebar_modules字段
+		"permissions":            permissions,                // 新增权限字段
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -1069,15 +1095,32 @@ func ManageUser(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgUserNoPermissionHigherLevel)
 		return
 	}
+	shouldPersistUser := true
 	switch req.Action {
 	case "disable":
-		user.Status = common.UserStatusDisabled
 		if user.Role == common.RoleRootUser {
 			common.ApiErrorI18n(c, i18n.MsgUserCannotDisableRootUser)
 			return
 		}
+		if _, err := model.DisableUserByAdmin(user.Id); err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		if err := model.DB.Unscoped().Where("id = ?", user.Id).First(&user).Error; err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		shouldPersistUser = false
 	case "enable":
-		user.Status = common.UserStatusEnabled
+		if err := model.EnableUserByAdmin(user.Id); err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		if err := model.DB.Unscoped().Where("id = ?", user.Id).First(&user).Error; err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		shouldPersistUser = false
 	case "delete":
 		if user.Role == common.RoleRootUser {
 			common.ApiErrorI18n(c, i18n.MsgUserCannotDeleteRootUser)
@@ -1164,15 +1207,17 @@ func ManageUser(c *gin.Context) {
 		return
 	}
 
-	if err := user.Update(false); err != nil {
-		common.ApiError(c, err)
-		return
+	if shouldPersistUser {
+		if err := user.Update(false); err != nil {
+			common.ApiError(c, err)
+			return
+		}
 	}
 	// 禁用 / 角色调整后，强制失效用户缓存与其全部令牌缓存，
 	// 避免在 Redis TTL 过期前仍使用旧状态（尤其是禁用后仍可发起请求的问题）。
 	// InvalidateUserCache 会让下一次 GetUserCache 从数据库重新加载，
 	// InvalidateUserTokensCache 则确保令牌侧的缓存也同步刷新。
-	if req.Action == "disable" || req.Action == "promote" || req.Action == "demote" {
+	if req.Action == "enable" || req.Action == "disable" || req.Action == "promote" || req.Action == "demote" {
 		if err := model.InvalidateUserCache(user.Id); err != nil {
 			common.SysLog(fmt.Sprintf("failed to invalidate user cache for user %d: %s", user.Id, err.Error()))
 		}
@@ -1181,8 +1226,10 @@ func ManageUser(c *gin.Context) {
 		}
 	}
 	clearUser := model.User{
-		Role:   user.Role,
-		Status: user.Status,
+		Role:              user.Role,
+		Status:            user.Status,
+		AutoDisabledUntil: user.AutoDisabledUntil,
+		BanCount:          user.BanCount,
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -1221,17 +1268,19 @@ func ManageUserBatch(c *gin.Context) {
 			if user.Role == common.RoleRootUser {
 				continue
 			}
-			user.Status = common.UserStatusDisabled
+			if _, err := model.DisableUserByAdmin(user.Id); err != nil {
+				common.ApiError(c, err)
+				return
+			}
 			needInvalidate = true
 		case "enable":
-			user.Status = common.UserStatusEnabled
+			if err := model.EnableUserByAdmin(user.Id); err != nil {
+				common.ApiError(c, err)
+				return
+			}
+			needInvalidate = true
 		default:
 			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
-			return
-		}
-
-		if err := user.Update(false); err != nil {
-			common.ApiError(c, err)
 			return
 		}
 

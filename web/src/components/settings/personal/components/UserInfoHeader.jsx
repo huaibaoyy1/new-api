@@ -29,10 +29,11 @@ import {
 import {
   isRoot,
   isAdmin,
+  isFormalUser,
   renderQuota,
   stringToColor,
 } from '../../../../helpers';
-import { Coins, BarChart2, Users } from 'lucide-react';
+import { Coins, BarChart2, ShieldAlert, Users } from 'lucide-react';
 
 const UserInfoHeader = ({ t, userState }) => {
   const getUsername = () => {
@@ -50,6 +51,7 @@ const UserInfoHeader = ({ t, userState }) => {
     }
     return 'NA';
   };
+  const formal = isFormalUser(userState?.user);
 
   return (
     <Card
@@ -108,6 +110,21 @@ const UserInfoHeader = ({ t, userState }) => {
                     <Tag size='large' shape='circle' style={{ color: 'white' }}>
                       ID: {userState?.user?.id}
                     </Tag>
+                    {!formal && (
+                      <Tag
+                        size='large'
+                        shape='circle'
+                        style={{
+                          backgroundColor: 'rgba(255, 247, 237, 0.96)',
+                          border: '1px solid rgba(251, 146, 60, 0.7)',
+                          color: '#9a3412',
+                          fontWeight: 600,
+                          boxShadow: '0 1px 2px rgba(15, 23, 42, 0.18)',
+                        }}
+                      >
+                        {t('待转正用户')}
+                      </Tag>
+                    )}
                   </div>
                 </div>
               </div>
@@ -154,6 +171,28 @@ const UserInfoHeader = ({ t, userState }) => {
               </div>
               <Divider layout='vertical' />
               <div className='flex items-center gap-2'>
+                <ShieldAlert size={16} />
+                <Typography.Text size='small' type='tertiary'>
+                  {t('封禁次数')}
+                </Typography.Text>
+                <Typography.Text size='small' type='tertiary' strong>
+                  {userState?.user?.ban_count || 0}
+                </Typography.Text>
+              </div>
+              <Divider layout='vertical' />
+              <div className='flex items-center gap-2'>
+                <ShieldAlert size={16} />
+                <Typography.Text size='small' type='tertiary'>
+                  {t('转正进度')}
+                </Typography.Text>
+                <Typography.Text size='small' type='tertiary' strong>
+                  {formal
+                    ? t('正式用户')
+                    : `${userState?.user?.probation_checkin_days || 0}/5`}
+                </Typography.Text>
+              </div>
+              <Divider layout='vertical' />
+              <div className='flex items-center gap-2'>
                 <Users size={16} />
                 <Typography.Text size='small' type='tertiary'>
                   {t('用户分组')}
@@ -189,6 +228,20 @@ const UserInfoHeader = ({ t, userState }) => {
             <Divider margin='8px' />
             <div className='flex items-center justify-between'>
               <div className='flex items-center gap-2'>
+                <ShieldAlert size={16} />
+                <Typography.Text size='small' type='tertiary'>
+                  {t('转正进度')}
+                </Typography.Text>
+              </div>
+              <Typography.Text size='small' type='tertiary' strong>
+                {formal
+                  ? t('正式用户')
+                  : `${userState?.user?.probation_checkin_days || 0}/5`}
+              </Typography.Text>
+            </div>
+            <Divider margin='8px' />
+            <div className='flex items-center justify-between'>
+              <div className='flex items-center gap-2'>
                 <BarChart2 size={16} />
                 <Typography.Text size='small' type='tertiary'>
                   {t('请求次数')}
@@ -196,6 +249,18 @@ const UserInfoHeader = ({ t, userState }) => {
               </div>
               <Typography.Text size='small' type='tertiary' strong>
                 {userState.user?.request_count || 0}
+              </Typography.Text>
+            </div>
+            <Divider margin='8px' />
+            <div className='flex items-center justify-between'>
+              <div className='flex items-center gap-2'>
+                <ShieldAlert size={16} />
+                <Typography.Text size='small' type='tertiary'>
+                  {t('封禁次数')}
+                </Typography.Text>
+              </div>
+              <Typography.Text size='small' type='tertiary' strong>
+                {userState?.user?.ban_count || 0}
               </Typography.Text>
             </div>
             <Divider margin='8px' />

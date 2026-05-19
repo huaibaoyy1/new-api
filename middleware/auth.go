@@ -224,6 +224,41 @@ func UserAuth() func(c *gin.Context) {
 	}
 }
 
+const probationBlockedMessage = "当前账号需完成 7 天内签到 5 天后才能使用该功能"
+
+func FormalUserRequired() func(c *gin.Context) {
+	return func(c *gin.Context) {
+		userId := c.GetInt("id")
+		if userId <= 0 {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"success": false,
+				"message": common.TranslateMessage(c, i18n.MsgAuthNotLoggedIn),
+			})
+			c.Abort()
+			return
+		}
+		userCache, err := model.GetUserCache(userId)
+		if err != nil {
+			common.SysLog(fmt.Sprintf("FormalUserRequired GetUserCache error for user %d: %v", userId, err))
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"message": common.TranslateMessage(c, i18n.MsgDatabaseError),
+			})
+			c.Abort()
+			return
+		}
+		if !userCache.IsFormal() {
+			c.JSON(http.StatusForbidden, gin.H{
+				"success": false,
+				"message": probationBlockedMessage,
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
 func AdminAuth() func(c *gin.Context) {
 	return func(c *gin.Context) {
 		authHelper(c, common.RoleAdminUser)
@@ -256,6 +291,14 @@ func TokenOrUserAuth() func(c *gin.Context) {
 						}
 					}
 					if err == nil && userCache.Status == common.UserStatusEnabled {
+						if !userCache.IsFormal() {
+							c.JSON(http.StatusForbidden, gin.H{
+								"success": false,
+								"message": probationBlockedMessage,
+							})
+							c.Abort()
+							return
+						}
 						session.Set("status", userCache.Status)
 						session.Set("group", userCache.Group)
 						_ = session.Save()
@@ -340,6 +383,14 @@ func TokenAuthReadOnly() func(c *gin.Context) {
 				c.Abort()
 				return
 			}
+		}
+		if !userCache.IsFormal() {
+			c.JSON(http.StatusForbidden, gin.H{
+				"success": false,
+				"message": probationBlockedMessage,
+			})
+			c.Abort()
+			return
 		}
 
 		c.Set("id", token.UserId)
@@ -462,6 +513,10 @@ func TokenAuth() func(c *gin.Context) {
 		}
 		if !userEnabled {
 			abortWithOpenAiMessage(c, http.StatusForbidden, common.TranslateMessage(c, i18n.MsgAuthUserBanned))
+			return
+		}
+		if !userCache.IsFormal() {
+			abortWithOpenAiMessage(c, http.StatusForbidden, probationBlockedMessage)
 			return
 		}
 

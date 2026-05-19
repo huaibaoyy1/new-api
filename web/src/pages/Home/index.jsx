@@ -25,7 +25,13 @@ import {
   ScrollList,
   ScrollItem,
 } from '@douyinfe/semi-ui';
-import { API, showError, copy, showSuccess } from '../../helpers';
+import {
+  API,
+  showError,
+  copy,
+  showSuccess,
+  getUserIdFromLocalStorage,
+} from '../../helpers';
 import { useIsMobile } from '../../hooks/common/useIsMobile';
 import { API_ENDPOINTS } from '../../constants/common.constant';
 import { StatusContext } from '../../context/Status';
@@ -72,6 +78,7 @@ const Home = () => {
   const [homePageContentLoaded, setHomePageContentLoaded] = useState(false);
   const [homePageContent, setHomePageContent] = useState('');
   const [noticeVisible, setNoticeVisible] = useState(false);
+  const [noticeReadKey, setNoticeReadKey] = useState('');
   const isMobile = useIsMobile();
   const isDemoSiteMode = statusState?.status?.demo_site_enabled || false;
   const docsLink = statusState?.status?.docs_link || '';
@@ -80,6 +87,18 @@ const Home = () => {
   const endpointItems = API_ENDPOINTS.map((e) => ({ value: e }));
   const [endpointIndex, setEndpointIndex] = useState(0);
   const isChinese = i18n.language.startsWith('zh');
+  const isLoggedIn = getUserIdFromLocalStorage() > 0;
+  const forceAnnouncementEnabled =
+    statusState?.status?.force_announcement_enabled ?? true;
+
+  const getNoticeKey = (content) => {
+    let hash = 0;
+    for (let i = 0; i < content.length; i += 1) {
+      hash = (hash << 5) - hash + content.charCodeAt(i);
+      hash |= 0;
+    }
+    return `${content.length}-${hash}`;
+  };
 
   const displayHomePageContent = async () => {
     setHomePageContent(localStorage.getItem('home_page_content') || '');
@@ -119,18 +138,19 @@ const Home = () => {
 
   useEffect(() => {
     const checkNoticeAndShow = async () => {
-      const lastCloseDate = localStorage.getItem('notice_close_date');
-      const today = new Date().toDateString();
-      if (lastCloseDate !== today) {
-        try {
-          const res = await API.get('/api/notice');
-          const { success, data } = res.data;
-          if (success && data && data.trim() !== '') {
+      try {
+        const res = await API.get('/api/notice');
+        const { success, data } = res.data;
+        if (success && data && data.trim() !== '') {
+          const nextNoticeKey = getNoticeKey(data);
+          const readNoticeKey = localStorage.getItem('notice_read_key');
+          setNoticeReadKey(nextNoticeKey);
+          if (readNoticeKey !== nextNoticeKey) {
             setNoticeVisible(true);
           }
-        } catch (error) {
-          console.error('获取公告失败:', error);
         }
+      } catch (error) {
+        console.error('获取公告失败:', error);
       }
     };
 
@@ -154,6 +174,13 @@ const Home = () => {
         visible={noticeVisible}
         onClose={() => setNoticeVisible(false)}
         isMobile={isMobile}
+        forceClose={isLoggedIn && forceAnnouncementEnabled}
+        requireConfirmation={isLoggedIn && forceAnnouncementEnabled}
+        onConfirmClose={() => {
+          if (noticeReadKey) {
+            localStorage.setItem('notice_read_key', noticeReadKey);
+          }
+        }}
       />
       {homePageContentLoaded && homePageContent === '' ? (
         <div className='w-full overflow-x-hidden'>

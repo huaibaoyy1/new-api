@@ -126,6 +126,18 @@ func InitEnv() {
 	SearchRateLimitEnable = GetEnvOrDefaultBool("SEARCH_RATE_LIMIT_ENABLE", true)
 	SearchRateLimitNum = GetEnvOrDefault("SEARCH_RATE_LIMIT", 10)
 	SearchRateLimitDuration = int64(GetEnvOrDefault("SEARCH_RATE_LIMIT_DURATION", 60))
+
+	GameDrawRateLimitEnable = GetEnvOrDefaultBool("GAME_DRAW_RATE_LIMIT_ENABLE", true)
+	GameDrawRateLimitNum = GetEnvOrDefault("GAME_DRAW_RATE_LIMIT", 120)
+	GameDrawRateLimitDuration = int64(GetEnvOrDefault("GAME_DRAW_RATE_LIMIT_DURATION", 60))
+
+	GamePokerRateLimitEnable = GetEnvOrDefaultBool("GAME_POKER_RATE_LIMIT_ENABLE", true)
+	GamePokerRateLimitNum = GetEnvOrDefault("GAME_POKER_RATE_LIMIT", 60)
+	GamePokerRateLimitDuration = int64(GetEnvOrDefault("GAME_POKER_RATE_LIMIT_DURATION", 60))
+
+	GameTreasureRateLimitEnable = GetEnvOrDefaultBool("GAME_TREASURE_RATE_LIMIT_ENABLE", true)
+	GameTreasureRateLimitNum = GetEnvOrDefault("GAME_TREASURE_RATE_LIMIT", 60)
+	GameTreasureRateLimitDuration = int64(GetEnvOrDefault("GAME_TREASURE_RATE_LIMIT_DURATION", 60))
 	initConstantEnv()
 }
 

@@ -27,7 +27,7 @@ import {
   IconCreditCard,
   IconKey,
 } from '@douyinfe/semi-icons';
-import { stringToColor } from '../../../helpers';
+import { isFormalUser, stringToColor } from '../../../helpers';
 import SkeletonWrapper from '../components/SkeletonWrapper';
 
 const UserArea = ({
@@ -37,6 +37,7 @@ const UserArea = ({
   isSelfUseMode,
   logout,
   navigate,
+  isGameRoute,
   t,
 }) => {
   const dropdownRef = useRef(null);
@@ -52,6 +53,17 @@ const UserArea = ({
   }
 
   if (userState.user) {
+    const formal = isFormalUser(userState.user);
+    const userButtonClassName = isGameRoute
+      ? 'flex items-center gap-1.5 !p-1 !rounded-full !bg-slate-100 hover:!bg-slate-200'
+      : 'flex items-center gap-1.5 !p-1 !rounded-full hover:!bg-semi-color-fill-1 dark:hover:!bg-gray-700 !bg-semi-color-fill-0 dark:!bg-semi-color-fill-1 dark:hover:!bg-semi-color-fill-2';
+    const usernameClassName = isGameRoute
+      ? '!text-xs !font-medium !text-slate-950 mr-1'
+      : '!text-xs !font-medium !text-semi-color-text-1 dark:!text-gray-300 mr-1';
+    const chevronClassName = isGameRoute
+      ? 'text-xs text-slate-700'
+      : 'text-xs text-semi-color-text-2 dark:text-gray-400';
+
     return (
       <div className='relative' ref={dropdownRef}>
         <Dropdown
@@ -73,6 +85,7 @@ const UserArea = ({
                   <span>{t('个人设置')}</span>
                 </div>
               </Dropdown.Item>
+              {formal && (
               <Dropdown.Item
                 onClick={() => {
                   navigate('/console/token');
@@ -87,6 +100,8 @@ const UserArea = ({
                   <span>{t('令牌管理')}</span>
                 </div>
               </Dropdown.Item>
+              )}
+              {formal && (
               <Dropdown.Item
                 onClick={() => {
                   navigate('/console/topup');
@@ -101,6 +116,7 @@ const UserArea = ({
                   <span>{t('钱包管理')}</span>
                 </div>
               </Dropdown.Item>
+              )}
               <Dropdown.Item
                 onClick={logout}
                 className='!px-3 !py-1.5 !text-sm !text-semi-color-text-0 hover:!bg-semi-color-fill-1 dark:!text-gray-200 dark:hover:!bg-red-500 dark:hover:!text-white'
@@ -119,7 +135,7 @@ const UserArea = ({
           <Button
             theme='borderless'
             type='tertiary'
-            className='flex items-center gap-1.5 !p-1 !rounded-full hover:!bg-semi-color-fill-1 dark:hover:!bg-gray-700 !bg-semi-color-fill-0 dark:!bg-semi-color-fill-1 dark:hover:!bg-semi-color-fill-2'
+            className={userButtonClassName}
           >
             <Avatar
               size='extra-small'
@@ -129,13 +145,13 @@ const UserArea = ({
               {userState.user.username[0].toUpperCase()}
             </Avatar>
             <span className='hidden md:inline'>
-              <Typography.Text className='!text-xs !font-medium !text-semi-color-text-1 dark:!text-gray-300 mr-1'>
+              <Typography.Text className={usernameClassName}>
                 {userState.user.username}
               </Typography.Text>
             </span>
             <ChevronDown
               size={14}
-              className='text-xs text-semi-color-text-2 dark:text-gray-400'
+              className={chevronClassName}
             />
           </Button>
         </Dropdown>
@@ -147,14 +163,16 @@ const UserArea = ({
     const commonSizingAndLayoutClass =
       'flex items-center justify-center !py-[10px] !px-1.5';
 
-    const loginButtonSpecificStyling =
-      '!bg-semi-color-fill-0 dark:!bg-semi-color-fill-1 hover:!bg-semi-color-fill-1 dark:hover:!bg-gray-700 transition-colors';
+    const loginButtonSpecificStyling = isGameRoute
+      ? '!bg-slate-100 hover:!bg-slate-200 transition-colors'
+      : '!bg-semi-color-fill-0 dark:!bg-semi-color-fill-1 hover:!bg-semi-color-fill-1 dark:hover:!bg-gray-700 transition-colors';
     let loginButtonClasses = `${commonSizingAndLayoutClass} ${loginButtonSpecificStyling}`;
 
     let registerButtonClasses = `${commonSizingAndLayoutClass}`;
 
-    const loginButtonTextSpanClass =
-      '!text-xs !text-semi-color-text-1 dark:!text-gray-300 !p-1.5';
+    const loginButtonTextSpanClass = isGameRoute
+      ? '!text-xs !text-slate-950 !p-1.5'
+      : '!text-xs !text-semi-color-text-1 dark:!text-gray-300 !p-1.5';
     const registerButtonTextSpanClass = '!text-xs !text-white !p-1.5';
 
     if (showRegisterButton) {

@@ -331,11 +331,8 @@ const SettingsAnnouncements = ({ options, refresh }) => {
       value,
     });
     const { success, message } = res.data;
-    if (success) {
-      showSuccess('系统公告已更新');
-      if (refresh) refresh();
-    } else {
-      showError(message);
+    if (!success) {
+      throw new Error(message || '设置更新失败');
     }
   };
 
@@ -345,9 +342,11 @@ const SettingsAnnouncements = ({ options, refresh }) => {
       const announcementsJson = JSON.stringify(announcementsList);
       await updateOption('console_setting.announcements', announcementsJson);
       setHasChanges(false);
+      showSuccess('系统公告已更新');
+      if (refresh) refresh();
     } catch (error) {
       console.error('系统公告更新失败', error);
-      showError('系统公告更新失败');
+      showError(error.message || '系统公告更新失败');
     } finally {
       setLoading(false);
     }

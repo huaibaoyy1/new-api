@@ -8,3 +8,15 @@ docs
 .eslintcache
 .gocache
 /web/node_modules
+go-test/
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+logs
+data/
+.gotmp
+.gomodcache/
+.gocache-temp
+.gopath
+.test

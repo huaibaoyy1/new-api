@@ -50,10 +50,15 @@ import OAuth2Callback from './components/auth/OAuth2Callback';
 import PersonalSetting from './components/settings/PersonalSetting';
 import Setup from './pages/Setup';
 import SetupCheck from './components/layout/SetupCheck';
+import GameBrowserGuard from './components/games/GameBrowserGuard';
 
 const Home = lazy(() => import('./pages/Home'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const About = lazy(() => import('./pages/About'));
+const Games = lazy(() => import('./pages/Games'));
+const MagicCube = lazy(() => import('./pages/Games/MagicCube'));
+const GoldenPoker = lazy(() => import('./pages/Games/GoldenPoker'));
+const QuotaTreasure = lazy(() => import('./pages/Games/QuotaTreasure'));
 const UserAgreement = lazy(() => import('./pages/UserAgreement'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 
@@ -127,6 +132,9 @@ function App() {
     }
     return false; // 默认不需要登录
   }, [statusState?.status?.HeaderNavModules]);
+
+  const statusLoaded = statusState?.status !== undefined;
+  const gamesEnabled = statusState?.status?.games_enabled === true;
 
   return (
     <SetupCheck>
@@ -380,6 +388,93 @@ function App() {
               <Suspense fallback={<Loading></Loading>} key={location.pathname}>
                 <Pricing />
               </Suspense>
+            )
+          }
+        />
+        <Route
+          path='/games'
+          element={
+            !statusLoaded ? (
+              <Loading />
+            ) : gamesEnabled ? (
+              <PrivateRoute>
+                <GameBrowserGuard>
+                  <Suspense
+                    fallback={<Loading></Loading>}
+                    key={location.pathname}
+                  >
+                    <Games />
+                  </Suspense>
+                </GameBrowserGuard>
+              </PrivateRoute>
+            ) : (
+              <NotFound />
+            )
+          }
+        />
+        <Route
+          path='/games/magic-cube'
+          element={
+            !statusLoaded ? (
+              <Loading />
+            ) : gamesEnabled &&
+              statusState?.status?.game_one_enabled === true ? (
+              <PrivateRoute>
+                <GameBrowserGuard>
+                  <Suspense
+                    fallback={<Loading></Loading>}
+                    key={location.pathname}
+                  >
+                    <MagicCube />
+                  </Suspense>
+                </GameBrowserGuard>
+              </PrivateRoute>
+            ) : (
+              <NotFound />
+            )
+          }
+        />
+        <Route
+          path='/games/golden-poker'
+          element={
+            !statusLoaded ? (
+              <Loading />
+            ) : gamesEnabled &&
+              statusState?.status?.game_two_enabled === true ? (
+              <PrivateRoute>
+                <GameBrowserGuard>
+                  <Suspense
+                    fallback={<Loading></Loading>}
+                    key={location.pathname}
+                  >
+                    <GoldenPoker />
+                  </Suspense>
+                </GameBrowserGuard>
+              </PrivateRoute>
+            ) : (
+              <NotFound />
+            )
+          }
+        />
+        <Route
+          path='/games/quota-treasure'
+          element={
+            !statusLoaded ? (
+              <Loading />
+            ) : gamesEnabled &&
+              statusState?.status?.game_three_enabled === true ? (
+              <PrivateRoute>
+                <GameBrowserGuard>
+                  <Suspense
+                    fallback={<Loading></Loading>}
+                    key={location.pathname}
+                  >
+                    <QuotaTreasure />
+                  </Suspense>
+                </GameBrowserGuard>
+              </PrivateRoute>
+            ) : (
+              <NotFound />
             )
           }
         />

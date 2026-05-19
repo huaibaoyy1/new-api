@@ -170,6 +170,31 @@ const UsersFilters = ({
             />
           </div>
           <div className='w-[140px]'>
+            <div className='mb-1 text-xs text-[var(--semi-color-text-2)]'>{t('正式状态')}</div>
+            <Form.Select
+              field='formalStatus'
+              placeholder={t('正式状态')}
+              optionList={[
+                { label: t('全部状态'), value: 0 },
+                { label: t('正式'), value: 1 },
+                { label: t('非正式'), value: 2 },
+              ]}
+              className='w-full'
+              pure
+              size='small'
+            />
+          </div>
+          <div className='w-[120px]'>
+            <div className='mb-1 text-xs text-[var(--semi-color-text-2)]'>{t('最小封禁')}</div>
+            <Form.InputNumber
+              field='minBanCount'
+              placeholder={t('例如 1')}
+              min={0}
+              pure
+              size='small'
+            />
+          </div>
+          <div className='w-[140px]'>
             <div className='mb-1 text-xs text-[var(--semi-color-text-2)]'>{t('请求风险')}</div>
             <Form.Select
               field='riskLevel'

@@ -32,13 +32,28 @@ const EnableDisableUserModal = ({
 
   return (
     <Modal
-      title={isDisable ? t('确定要禁用此用户吗？') : t('确定要启用此用户吗？')}
+      title={
+        isDisable
+          ? t('确定要禁用此用户吗？')
+          : t('确定要启用此用户吗？')
+      }
       visible={visible}
       onCancel={onCancel}
       onOk={onConfirm}
       type='warning'
     >
-      {isDisable ? t('此操作将禁用用户账户') : t('此操作将启用用户账户')}
+      <div className='space-y-2'>
+        <div>
+          {isDisable
+            ? t('此操作将禁用用户账户')
+            : t('此操作将启用用户账户')}
+        </div>
+        <div className='text-xs text-[var(--semi-color-text-2)]'>
+          {isDisable
+            ? t('本次禁用会增加用户封禁次数，封禁超过3次后将不再自动解封')
+            : t('手动启用会保留用户封禁次数，但会清除自动解封时间')}
+        </div>
+      </div>
     </Modal>
   );
 };

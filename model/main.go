@@ -284,6 +284,12 @@ func migrateDB() error {
 		&LotteryActivity{},
 		&LotteryActivityRun{},
 		&LotteryWinner{},
+		&GameUserStat{},
+		&GameDrawLog{},
+		&GameMilestoneClaim{},
+		&GameExchangeLog{},
+		&GamePokerRound{},
+		&GameTreasureRound{},
 	)
 	if err != nil {
 		return err
@@ -339,6 +345,12 @@ func migrateDBFast() error {
 		{&LotteryActivity{}, "LotteryActivity"},
 		{&LotteryActivityRun{}, "LotteryActivityRun"},
 		{&LotteryWinner{}, "LotteryWinner"},
+		{&GameUserStat{}, "GameUserStat"},
+		{&GameDrawLog{}, "GameDrawLog"},
+		{&GameMilestoneClaim{}, "GameMilestoneClaim"},
+		{&GameExchangeLog{}, "GameExchangeLog"},
+		{&GamePokerRound{}, "GamePokerRound"},
+		{&GameTreasureRound{}, "GameTreasureRound"},
 	}
 	// 动态计算migration数量，确保errChan缓冲区足够大
 	errChan := make(chan error, len(migrations))

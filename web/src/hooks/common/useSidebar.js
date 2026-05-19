@@ -19,7 +19,9 @@ For commercial licensing, please contact support@quantumnous.com
 
 import { useState, useEffect, useMemo, useContext, useRef } from 'react';
 import { StatusContext } from '../../context/Status';
+import { UserContext } from '../../context/User';
 import { API } from '../../helpers';
+import { isFormalUser } from '../../helpers';
 
 // 创建一个全局事件系统来同步所有useSidebar实例
 const sidebarEventTarget = new EventTarget();
@@ -79,6 +81,7 @@ export const mergeAdminConfig = (savedConfig) => {
 
 export const useSidebar = () => {
   const [statusState] = useContext(StatusContext);
+  const [userState] = useContext(UserContext);
   const [userConfig, setUserConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const instanceIdRef = useRef(null);
@@ -229,6 +232,15 @@ export const useSidebar = () => {
     // 遍历所有区域
     Object.keys(adminConfig).forEach((sectionKey) => {
       const adminSection = adminConfig[sectionKey];
+      const formal = isFormalUser(userState?.user);
+      if (!formal) {
+        if (sectionKey === 'personal') {
+          result[sectionKey] = { enabled: true, personal: true };
+        } else {
+          result[sectionKey] = { enabled: false };
+        }
+        return;
+      }
       const userSection = userConfig[sectionKey];
 
       // 如果管理员禁用了整个区域，则该区域不显示
@@ -258,7 +270,7 @@ export const useSidebar = () => {
     });
 
     return result;
-  }, [adminConfig, userConfig]);
+  }, [adminConfig, userConfig, userState?.user]);
 
   // 检查特定功能是否应该显示
   const isModuleVisible = (sectionKey, moduleKey = null) => {

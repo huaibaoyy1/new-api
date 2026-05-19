@@ -93,6 +93,7 @@ func UserCheckin(userId int) (*Checkin, error) {
 
 // userCheckinWithTransaction 使用事务执行签到（适用于 MySQL 和 PostgreSQL）
 func userCheckinWithTransaction(checkin *Checkin, userId int, quotaAwarded int) (*Checkin, error) {
+	now := time.Now().Unix()
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		// 步骤1: 创建签到记录
 		// 数据库有唯一约束 (user_id, checkin_date)，可以防止并发重复签到
@@ -106,6 +107,10 @@ func userCheckinWithTransaction(checkin *Checkin, userId int, quotaAwarded int) 
 			return errors.New("签到失败：更新额度出错")
 		}
 
+		if _, err := UpdateProbationAfterCheckinWithTx(tx, userId, now); err != nil {
+			return err
+		}
+
 		return nil
 	})
 
@@ -115,7 +120,7 @@ func userCheckinWithTransaction(checkin *Checkin, userId int, quotaAwarded int) 
 
 	// 事务成功后，异步更新缓存
 	go func() {
-		_ = cacheIncrUserQuota(userId, int64(quotaAwarded))
+		_ = InvalidateUserCache(userId)
 	}()
 
 	return checkin, nil
@@ -135,6 +140,12 @@ func userCheckinWithoutTransaction(checkin *Checkin, userId int, quotaAwarded in
 		// 如果增加额度失败，需要回滚签到记录
 		DB.Delete(checkin)
 		return nil, errors.New("签到失败：更新额度出错")
+	}
+
+	if _, err := UpdateProbationAfterCheckinWithTx(DB, userId, time.Now().Unix()); err != nil {
+		DB.Delete(checkin)
+		_ = DecreaseUserQuota(userId, quotaAwarded, true)
+		return nil, err
 	}
 
 	return checkin, nil

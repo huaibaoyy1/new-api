@@ -13,6 +13,8 @@ type UserActivityFilter struct {
 	ConsumeStatus string
 	CheckinStatus string
 	UserStatus    int
+	FormalStatus  int
+	MinBanCount   int
 	RiskLevel     string
 	MinErrorRate  float64
 	MinStatus429  int
@@ -127,6 +129,14 @@ COALESCE(checkin_stats.checkin_count, 0) AS checkin_count`).
 
 	if filter.UserStatus != 0 {
 		query = query.Where("users.status = ?", filter.UserStatus)
+	}
+	if filter.FormalStatus == UserFormalStatusFormal {
+		query = query.Where("(users.formal_status = ? OR users.formal_status = 0)", UserFormalStatusFormal)
+	} else if filter.FormalStatus == UserFormalStatusProbation {
+		query = query.Where("users.formal_status = ?", UserFormalStatusProbation)
+	}
+	if filter.MinBanCount > 0 {
+		query = query.Where("COALESCE(users.ban_count, 0) >= ?", filter.MinBanCount)
 	}
 
 	return query
@@ -285,6 +295,8 @@ func GetUserActivitySummary(keyword string, group string, filter UserActivityFil
 		ConsumeStatus: "consumed",
 		CheckinStatus: "all",
 		UserStatus:    filter.UserStatus,
+		FormalStatus:  filter.FormalStatus,
+		MinBanCount:   filter.MinBanCount,
 	}).Count(&summary.ConsumedUsers).Error; err != nil {
 		tx.Rollback()
 		return nil, err
@@ -296,6 +308,8 @@ func GetUserActivitySummary(keyword string, group string, filter UserActivityFil
 		ConsumeStatus: "all",
 		CheckinStatus: "checked",
 		UserStatus:    filter.UserStatus,
+		FormalStatus:  filter.FormalStatus,
+		MinBanCount:   filter.MinBanCount,
 	}).Count(&summary.CheckedUsers).Error; err != nil {
 		tx.Rollback()
 		return nil, err

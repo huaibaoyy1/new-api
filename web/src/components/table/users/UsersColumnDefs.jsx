@@ -126,6 +126,21 @@ const renderRiskSummary = (record, openUserRiskModal, t) => {
   );
 };
 
+const renderAccountRisk = (record, t) => {
+  const isFormal = Number(record.formal_status || 1) === 1;
+  const banCount = Number(record.ban_count || 0);
+  return (
+    <Space spacing={4} wrap>
+      <Tag color={isFormal ? 'green' : 'orange'} shape='circle'>
+        {isFormal ? t('正式') : t('非正式')}
+      </Tag>
+      <Tag color={banCount > 0 ? (banCount >= 3 ? 'red' : 'orange') : 'grey'} shape='circle'>
+        {t('封禁')} {renderNumber(banCount)} {t('次')}
+      </Tag>
+    </Space>
+  );
+};
+
 /**
  * Render user role
  */
@@ -438,6 +453,11 @@ export const getUsersColumns = ({
       render: (text, record, index) => {
         return <div>{renderRole(text, t)}</div>;
       },
+    },
+    {
+      title: t('账号风控'),
+      key: 'account_risk',
+      render: (text, record) => renderAccountRisk(record, t),
     },
     {
       title: t('邀请信息'),

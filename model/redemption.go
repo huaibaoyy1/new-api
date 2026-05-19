@@ -74,12 +74,13 @@ func SearchRedemptions(keyword string, startIdx int, num int) (redemptions []*Re
 
 	// Build query based on keyword type
 	query := tx.Model(&Redemption{})
+	likeKeyword := keyword + "%"
 
 	// Only try to convert to ID if the string represents a valid integer
 	if id, err := strconv.Atoi(keyword); err == nil {
-		query = query.Where("id = ? OR name LIKE ?", id, keyword+"%")
+		query = query.Where("id = ? OR name LIKE ? OR "+commonKeyCol+" LIKE ?", id, likeKeyword, likeKeyword)
 	} else {
-		query = query.Where("name LIKE ?", keyword+"%")
+		query = query.Where("name LIKE ? OR "+commonKeyCol+" LIKE ?", likeKeyword, likeKeyword)
 	}
 
 	// Get total count
@@ -122,6 +123,7 @@ func Redeem(key string, userId int) (quota int, err error) {
 	}
 	redemption := &Redemption{}
 	userUpgradedToVIP := false
+	adminGenerated := false
 
 	keyCol := "`key`"
 	if common.UsingPostgreSQL {
@@ -147,12 +149,21 @@ func Redeem(key string, userId int) (quota int, err error) {
 			return err
 		}
 
+		if redemption.UserId > 0 {
+			var creatorRole int
+			err = tx.Model(&User{}).Where("id = ?", redemption.UserId).Select("role").Find(&creatorRole).Error
+			if err != nil {
+				return err
+			}
+			adminGenerated = creatorRole >= common.RoleAdminUser
+		}
+
 		var currentGroup string
-		err = tx.Model(&User{}).Where("id = ?", userId).Select(commonGroupCol).Find(&currentGroup).Error
+		err = tx.Model(&User{}).Where("id = ?", userId).Select("group").Find(&currentGroup).Error
 		if err != nil {
 			return err
 		}
-		if currentGroup != "vip" {
+		if adminGenerated && currentGroup != "vip" {
 			err = tx.Model(&User{}).Where("id = ?", userId).Update("group", "vip").Error
 			if err != nil {
 				return err
@@ -172,10 +183,14 @@ func Redeem(key string, userId int) (quota int, err error) {
 	}
 	if userUpgradedToVIP {
 		_ = UpdateUserGroupCache(userId, "vip")
-		RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码充值 %s，兑换码ID %d，并自动升级为 VIP", logger.LogQuota(redemption.Quota), redemption.Id))
-	} else {
-		RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码充值 %s，兑换码ID %d，用户已是 VIP，跳过升级", logger.LogQuota(redemption.Quota), redemption.Id))
+		RecordLog(userId, LogTypeTopup, fmt.Sprintf("成功兑换站内额度 %s，并升级为 VIP", logger.LogQuota(redemption.Quota)))
+		return redemption.Quota, nil
 	}
+	if adminGenerated {
+		RecordLog(userId, LogTypeTopup, fmt.Sprintf("成功兑换站内额度 %s", logger.LogQuota(redemption.Quota)))
+		return redemption.Quota, nil
+	}
+	RecordLog(userId, LogTypeTopup, fmt.Sprintf("成功兑换站内额度 %s", logger.LogQuota(redemption.Quota)))
 	return redemption.Quota, nil
 }
 

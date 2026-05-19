@@ -25,6 +25,7 @@ import {
   Tabs,
   TabPane,
   Timeline,
+  Checkbox,
 } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
 import {
@@ -41,18 +42,24 @@ import {
 import { StatusContext } from '../../context/Status';
 import { Bell, Megaphone } from 'lucide-react';
 
+const DEFAULT_ANNOUNCEMENT_CONFIRM_TEXT = '我确认已阅读并理解以上公告内容';
+
 const NoticeModal = ({
   visible,
   onClose,
   isMobile,
   defaultTab = 'inApp',
   unreadKeys = [],
+  forceClose = false,
+  requireConfirmation = false,
+  onConfirmClose,
 }) => {
   const { t } = useTranslation();
   const [noticeContent, setNoticeContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [markingRead, setMarkingRead] = useState(false);
   const [activeTab, setActiveTab] = useState(defaultTab);
+  const [confirmedRead, setConfirmedRead] = useState(false);
 
   const [statusState] = useContext(StatusContext);
 
@@ -132,6 +139,7 @@ const NoticeModal = ({
       }
     }
 
+    onConfirmClose?.();
     onClose();
 
     const userId = getUserIdFromLocalStorage();
@@ -164,6 +172,7 @@ const NoticeModal = ({
 
   useEffect(() => {
     if (visible) {
+      setConfirmedRead(false);
       displayNotice();
     }
   }, [visible]);
@@ -266,6 +275,19 @@ const NoticeModal = ({
     return renderAnnouncementTimeline();
   };
 
+  const handleCancel = () => {
+    if (forceClose) {
+      return;
+    }
+    onClose();
+  };
+
+  const shouldRequireConfirmation = forceClose && requireConfirmation;
+  const userId = getUserIdFromLocalStorage();
+  const isLoggedIn = userId && userId > 0;
+  const shouldShowConfirmation = shouldRequireConfirmation && isLoggedIn;
+  const canCloseNotice = !shouldShowConfirmation || confirmedRead;
+
   return (
     <Modal
       title={
@@ -292,15 +314,39 @@ const NoticeModal = ({
         </div>
       }
       visible={visible}
-      onCancel={onClose}
+      onCancel={handleCancel}
+      closable={!forceClose}
+      maskClosable={!forceClose}
+      closeOnEsc={!forceClose}
       footer={
-        <div className='flex justify-end'>
-          <Button type='secondary' onClick={handleCloseTodayNotice} loading={markingRead}>
-            {t('今日关闭')}
-          </Button>
-          <Button type='primary' onClick={handleCloseTodayNotice} loading={markingRead}>
-            {t('关闭公告')}
-          </Button>
+        <div className='flex flex-col gap-3'>
+          {shouldShowConfirmation && (
+            <Checkbox
+              checked={confirmedRead}
+              onChange={(e) => setConfirmedRead(e.target.checked)}
+            >
+              {DEFAULT_ANNOUNCEMENT_CONFIRM_TEXT}
+            </Checkbox>
+          )}
+          <div className='flex justify-end'>
+            {!forceClose && (
+              <Button
+                type='secondary'
+                onClick={handleCloseTodayNotice}
+                loading={markingRead}
+              >
+                {t('今日关闭')}
+              </Button>
+            )}
+            <Button
+              type='primary'
+              onClick={handleCloseTodayNotice}
+              loading={markingRead}
+              disabled={!canCloseNotice}
+            >
+              {t('关闭公告')}
+            </Button>
+          </div>
         </div>
       }
       size={isMobile ? 'full-width' : 'large'}

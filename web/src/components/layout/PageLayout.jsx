@@ -60,6 +60,10 @@ const PageLayout = () => {
     '/console/task',
     '/console/models',
     '/pricing',
+    '/games',
+    '/games/magic-cube',
+    '/games/golden-poker',
+    '/games/quota-treasure',
   ];
 
   const shouldHideFooter = cardProPages.includes(location.pathname);
@@ -70,6 +74,8 @@ const PageLayout = () => {
     location.pathname !== '/console/playground';
 
   const isConsoleRoute = location.pathname.startsWith('/console');
+  const isGameRoute =
+    location.pathname === '/games' || location.pathname.startsWith('/games/');
   const showSider = isConsoleRoute && (!isMobile || drawerOpen);
 
   useEffect(() => {
@@ -78,11 +84,27 @@ const PageLayout = () => {
     }
   }, [isMobile, drawerOpen, collapsed, setCollapsed]);
 
+  useEffect(() => {
+    document.body.classList.toggle('game-route-active', isGameRoute);
+
+    return () => {
+      document.body.classList.remove('game-route-active');
+    };
+  }, [isGameRoute]);
+
   const loadUser = () => {
     let user = localStorage.getItem('user');
     if (user) {
       let data = JSON.parse(user);
       userDispatch({ type: 'login', payload: data });
+      API.get('/api/user/self')
+        .then((res) => {
+          if (res.data.success) {
+            userDispatch({ type: 'login', payload: res.data.data });
+            localStorage.setItem('user', JSON.stringify(res.data.data));
+          }
+        })
+        .catch(() => {});
     }
   };
 
@@ -154,6 +176,7 @@ const PageLayout = () => {
       }}
     >
       <Header
+        className={isGameRoute ? 'game-layout-header' : undefined}
         style={{
           padding: 0,
           height: 'auto',
@@ -162,6 +185,14 @@ const PageLayout = () => {
           width: '100%',
           top: 0,
           zIndex: 100,
+          ...(isGameRoute
+            ? {
+              background: '#ffffff',
+              color: '#0f172a',
+                borderBottom: 'none',
+                boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08)',
+              }
+            : {}),
         }}
       >
         <HeaderBar

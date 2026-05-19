@@ -2,7 +2,6 @@ package model
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -18,55 +17,83 @@ import (
 
 const UserNameMaxLength = 20
 
+const (
+	UserFormalStatusFormal    = 1
+	UserFormalStatusProbation = 2
+)
+
+const (
+	ProbationCheckinTarget = 5
+	ProbationWindowSeconds = 7 * 24 * 60 * 60
+)
+
 // User if you add sensitive fields, don't forget to clean them in setupLogin function.
 // Otherwise, the sensitive information will be saved on local storage in plain text!
 type User struct {
-	Id               int            `json:"id"`
-	Username         string         `json:"username" gorm:"unique;index" validate:"max=20"`
-	Password         string         `json:"password" gorm:"not null;" validate:"min=8,max=20"`
-	OriginalPassword string         `json:"original_password" gorm:"-:all"` // this field is only for Password change verification, don't save it to database!
-	DisplayName      string         `json:"display_name" gorm:"index" validate:"max=20"`
-	Role             int            `json:"role" gorm:"type:int;default:1"`   // admin, common
-	Status           int            `json:"status" gorm:"type:int;default:1"` // enabled, disabled
-	Email            string         `json:"email" gorm:"index" validate:"max=50"`
-	GitHubId         string         `json:"github_id" gorm:"column:github_id;index"`
-	DiscordId        string         `json:"discord_id" gorm:"column:discord_id;index"`
-	OidcId           string         `json:"oidc_id" gorm:"column:oidc_id;index"`
-	WeChatId         string         `json:"wechat_id" gorm:"column:wechat_id;index"`
-	TelegramId       string         `json:"telegram_id" gorm:"column:telegram_id;index"`
-	VerificationCode string         `json:"verification_code" gorm:"-:all"`                                    // this field is only for Email verification, don't save it to database!
-	AccessToken      *string        `json:"access_token" gorm:"type:char(32);column:access_token;uniqueIndex"` // this token is for system management
-	Quota            int            `json:"quota" gorm:"type:int;default:0"`
-	UsedQuota        int            `json:"used_quota" gorm:"type:int;default:0;column:used_quota"` // used quota
-	RequestCount     int            `json:"request_count" gorm:"type:int;default:0;"`               // request number
-	Group            string         `json:"group" gorm:"type:varchar(64);default:'default'"`
-	AffCode          string         `json:"aff_code" gorm:"type:varchar(32);column:aff_code;uniqueIndex"`
-	AffCount         int            `json:"aff_count" gorm:"type:int;default:0;column:aff_count"`
-	AffQuota         int            `json:"aff_quota" gorm:"type:int;default:0;column:aff_quota"`           // 邀请剩余额度
-	AffHistoryQuota  int            `json:"aff_history_quota" gorm:"type:int;default:0;column:aff_history"` // 邀请历史额度
-	InviterId        int            `json:"inviter_id" gorm:"type:int;column:inviter_id;index"`
-	DeletedAt        gorm.DeletedAt `gorm:"index"`
-	LinuxDOId        string         `json:"linux_do_id" gorm:"column:linux_do_id;index"`
-	Setting          string         `json:"setting" gorm:"type:text;column:setting"`
-	Remark            string         `json:"remark,omitempty" gorm:"type:varchar(255)" validate:"max=255"`
-	StripeCustomer    string         `json:"stripe_customer" gorm:"type:varchar(64);column:stripe_customer;index"`
-	AutoDisabledUntil int64          `json:"auto_disabled_until" gorm:"type:bigint;default:0;column:auto_disabled_until;index"`
-	CreatedAt         int64          `json:"created_at" gorm:"autoCreateTime;column:created_at"`
-	LastLoginAt       int64          `json:"last_login_at" gorm:"default:0;column:last_login_at"`
-	LastLoginIP       string         `json:"last_login_ip" gorm:"type:varchar(64);default:'';column:last_login_ip"`
+	Id                   int            `json:"id"`
+	Username             string         `json:"username" gorm:"unique;index" validate:"max=20"`
+	Password             string         `json:"password" gorm:"not null;" validate:"min=8,max=20"`
+	OriginalPassword     string         `json:"original_password" gorm:"-:all"` // this field is only for Password change verification, don't save it to database!
+	DisplayName          string         `json:"display_name" gorm:"index" validate:"max=20"`
+	Role                 int            `json:"role" gorm:"type:int;default:1"`   // admin, common
+	Status               int            `json:"status" gorm:"type:int;default:1"` // enabled, disabled
+	Email                string         `json:"email" gorm:"index" validate:"max=50"`
+	GitHubId             string         `json:"github_id" gorm:"column:github_id;index"`
+	DiscordId            string         `json:"discord_id" gorm:"column:discord_id;index"`
+	OidcId               string         `json:"oidc_id" gorm:"column:oidc_id;index"`
+	WeChatId             string         `json:"wechat_id" gorm:"column:wechat_id;index"`
+	TelegramId           string         `json:"telegram_id" gorm:"column:telegram_id;index"`
+	VerificationCode     string         `json:"verification_code" gorm:"-:all"`                                    // this field is only for Email verification, don't save it to database!
+	AccessToken          *string        `json:"access_token" gorm:"type:char(32);column:access_token;uniqueIndex"` // this token is for system management
+	Quota                int            `json:"quota" gorm:"type:int;default:0"`
+	UsedQuota            int            `json:"used_quota" gorm:"type:int;default:0;column:used_quota"` // used quota
+	RequestCount         int            `json:"request_count" gorm:"type:int;default:0;"`               // request number
+	Group                string         `json:"group" gorm:"type:varchar(64);default:'default'"`
+	AffCode              string         `json:"aff_code" gorm:"type:varchar(32);column:aff_code;uniqueIndex"`
+	AffCount             int            `json:"aff_count" gorm:"type:int;default:0;column:aff_count"`
+	AffQuota             int            `json:"aff_quota" gorm:"type:int;default:0;column:aff_quota"`           // 邀请剩余额度
+	AffHistoryQuota      int            `json:"aff_history_quota" gorm:"type:int;default:0;column:aff_history"` // 邀请历史额度
+	InviterId            int            `json:"inviter_id" gorm:"type:int;column:inviter_id;index"`
+	DeletedAt            gorm.DeletedAt `gorm:"index"`
+	LinuxDOId            string         `json:"linux_do_id" gorm:"column:linux_do_id;index"`
+	Setting              string         `json:"setting" gorm:"type:text;column:setting"`
+	Remark               string         `json:"remark,omitempty" gorm:"type:varchar(255)" validate:"max=255"`
+	StripeCustomer       string         `json:"stripe_customer" gorm:"type:varchar(64);column:stripe_customer;index"`
+	AutoDisabledUntil    int64          `json:"auto_disabled_until" gorm:"type:bigint;default:0;column:auto_disabled_until;index"`
+	BanCount             int            `json:"ban_count" gorm:"type:int;default:0;column:ban_count"`
+	FormalStatus         int            `json:"formal_status" gorm:"type:int;default:1;column:formal_status;index"`
+	ProbationStartedAt   int64          `json:"probation_started_at" gorm:"type:bigint;default:0;column:probation_started_at"`
+	ProbationCheckinDays int            `json:"probation_checkin_days" gorm:"type:int;default:0;column:probation_checkin_days"`
+	CreatedAt            int64          `json:"created_at" gorm:"autoCreateTime;column:created_at"`
+	LastLoginAt          int64          `json:"last_login_at" gorm:"default:0;column:last_login_at"`
+	LastLoginIP          string         `json:"last_login_ip" gorm:"type:varchar(64);default:'';column:last_login_ip"`
 }
 
 func (user *User) ToBaseUser() *UserBase {
 	cache := &UserBase{
-		Id:       user.Id,
-		Group:    user.Group,
-		Quota:    user.Quota,
-		Status:   user.Status,
-		Username: user.Username,
-		Setting:  user.Setting,
-		Email:    user.Email,
+		Id:                   user.Id,
+		Group:                user.Group,
+		Quota:                user.Quota,
+		Status:               user.Status,
+		Username:             user.Username,
+		Setting:              user.Setting,
+		Email:                user.Email,
+		FormalStatus:         user.GetFormalStatus(),
+		ProbationStartedAt:   user.ProbationStartedAt,
+		ProbationCheckinDays: user.ProbationCheckinDays,
 	}
 	return cache
+}
+
+func (user *User) GetFormalStatus() int {
+	if user.FormalStatus == 0 {
+		return UserFormalStatusFormal
+	}
+	return user.FormalStatus
+}
+
+func (user *User) IsFormal() bool {
+	return user.GetFormalStatus() == UserFormalStatusFormal
 }
 
 func (user *User) GetAccessToken() string {
@@ -83,7 +110,7 @@ func (user *User) SetAccessToken(token string) {
 func (user *User) GetSetting() dto.UserSetting {
 	setting := dto.UserSetting{}
 	if user.Setting != "" {
-		err := json.Unmarshal([]byte(user.Setting), &setting)
+		err := common.Unmarshal([]byte(user.Setting), &setting)
 		if err != nil {
 			common.SysLog("failed to unmarshal setting: " + err.Error())
 		}
@@ -92,7 +119,7 @@ func (user *User) GetSetting() dto.UserSetting {
 }
 
 func (user *User) SetSetting(setting dto.UserSetting) {
-	settingBytes, err := json.Marshal(setting)
+	settingBytes, err := common.Marshal(setting)
 	if err != nil {
 		common.SysLog("failed to marshal setting: " + err.Error())
 		return
@@ -153,7 +180,7 @@ func generateDefaultSidebarConfigForRole(userRole int) string {
 	// 普通用户不包含admin区域
 
 	// 转换为JSON字符串
-	configBytes, err := json.Marshal(defaultConfig)
+	configBytes, err := common.Marshal(defaultConfig)
 	if err != nil {
 		common.SysLog("生成默认边栏配置失败: " + err.Error())
 		return ""
@@ -359,7 +386,15 @@ func (user *User) Insert(inviterId int) error {
 			return err
 		}
 	}
-	user.Quota = common.QuotaForNewUser
+	if user.FormalStatus == 0 {
+		user.FormalStatus = UserFormalStatusFormal
+	}
+	if user.FormalStatus == UserFormalStatusProbation {
+		user.Quota = 0
+		inviterId = 0
+	} else {
+		user.Quota = common.QuotaForNewUser
+	}
 	//user.SetAccessToken(common.GetUUID())
 	user.AffCode = common.GetRandomString(4)
 
@@ -390,7 +425,7 @@ func (user *User) Insert(inviterId int) error {
 		}
 	}
 
-	if common.QuotaForNewUser > 0 {
+	if user.FormalStatus != UserFormalStatusProbation && common.QuotaForNewUser > 0 {
 		RecordLog(user.Id, LogTypeSystem, fmt.Sprintf("新用户注册赠送 %s", logger.LogQuota(common.QuotaForNewUser)))
 	}
 	if inviterId != 0 {
@@ -418,7 +453,15 @@ func (user *User) InsertWithTx(tx *gorm.DB, inviterId int) error {
 			return err
 		}
 	}
-	user.Quota = common.QuotaForNewUser
+	if user.FormalStatus == 0 {
+		user.FormalStatus = UserFormalStatusFormal
+	}
+	if user.FormalStatus == UserFormalStatusProbation {
+		user.Quota = 0
+		inviterId = 0
+	} else {
+		user.Quota = common.QuotaForNewUser
+	}
 	user.AffCode = common.GetRandomString(4)
 
 	// 初始化用户设置
@@ -451,7 +494,7 @@ func (user *User) FinalizeOAuthUserCreation(inviterId int) {
 		}
 	}
 
-	if common.QuotaForNewUser > 0 {
+	if user.FormalStatus != UserFormalStatusProbation && common.QuotaForNewUser > 0 {
 		RecordLog(user.Id, LogTypeSystem, fmt.Sprintf("新用户注册赠送 %s", logger.LogQuota(common.QuotaForNewUser)))
 	}
 	if inviterId != 0 {
@@ -1043,6 +1086,69 @@ func CountRecentUserErrors(userId int, lookbackMinutes int) (int64, error) {
 	return count, err
 }
 
+func disableEnabledUser(tx *gorm.DB, user *User, autoDisabledUntil int64) (bool, error) {
+	if user == nil || user.Status != common.UserStatusEnabled {
+		return false, nil
+	}
+	nextBanCount := user.BanCount + 1
+	if autoDisabledUntil > 0 && nextBanCount > 3 {
+		autoDisabledUntil = 0
+	}
+	if err := tx.Model(&User{}).Where("id = ?", user.Id).Updates(map[string]interface{}{
+		"status":              common.UserStatusDisabled,
+		"auto_disabled_until": autoDisabledUntil,
+		"ban_count":           gorm.Expr("COALESCE(ban_count, 0) + ?", 1),
+	}).Error; err != nil {
+		return false, err
+	}
+	user.Status = common.UserStatusDisabled
+	user.AutoDisabledUntil = autoDisabledUntil
+	user.BanCount = nextBanCount
+	return true, nil
+}
+
+func DisableUserByAdmin(userId int) (bool, error) {
+	if userId <= 0 {
+		return false, errors.New("invalid user id")
+	}
+	disabled := false
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var user User
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("id = ?", userId).First(&user).Error; err != nil {
+			return err
+		}
+		if user.Role == common.RoleRootUser {
+			return errors.New("cannot disable root user")
+		}
+		var err error
+		disabled, err = disableEnabledUser(tx, &user, 0)
+		return err
+	})
+	if err != nil {
+		return false, err
+	}
+	if disabled {
+		_ = InvalidateUserCache(userId)
+		_ = InvalidateUserTokensCache(userId)
+	}
+	return disabled, nil
+}
+
+func EnableUserByAdmin(userId int) error {
+	if userId <= 0 {
+		return errors.New("invalid user id")
+	}
+	if err := DB.Model(&User{}).Where("id = ?", userId).Updates(map[string]interface{}{
+		"status":              common.UserStatusEnabled,
+		"auto_disabled_until": 0,
+	}).Error; err != nil {
+		return err
+	}
+	_ = InvalidateUserCache(userId)
+	_ = InvalidateUserTokensCache(userId)
+	return nil
+}
+
 func AutoDisableUserIfNeeded(userId int) error {
 	if !common.AutomaticDisableUserEnabled || userId <= 0 {
 		return nil
@@ -1077,13 +1183,12 @@ func AutoDisableUserIfNeeded(userId int) error {
 			durationMinutes = 60
 		}
 		disabledUntil = time.Now().Add(time.Duration(durationMinutes) * time.Minute).Unix()
-		if err := tx.Model(&User{}).Where("id = ?", userId).Updates(map[string]interface{}{
-			"status":              common.UserStatusDisabled,
-			"auto_disabled_until": disabledUntil,
-		}).Error; err != nil {
+		disabled, err := disableEnabledUser(tx, &user, disabledUntil)
+		if err != nil {
 			return err
 		}
-		autoDisabled = true
+		autoDisabled = disabled
+		disabledUntil = user.AutoDisabledUntil
 		return nil
 	})
 	if err != nil {
@@ -1095,6 +1200,12 @@ func AutoDisableUserIfNeeded(userId int) error {
 
 	_ = InvalidateUserCache(userId)
 	_ = InvalidateUserTokensCache(userId)
+	if disabledUntil == 0 {
+		RecordLog(userId, LogTypeSystem, fmt.Sprintf("user reached %d errors in the last %d minutes and was disabled; ban count exceeded 3, manual enable required",
+			errorCount,
+			common.AutomaticDisableUserLookbackMinutes))
+		return nil
+	}
 	RecordLog(userId, LogTypeSystem, fmt.Sprintf("用户最近 %d 分钟内错误次数达到 %d 次，系统已自动封禁 %d 分钟，解封时间：%s",
 		common.AutomaticDisableUserLookbackMinutes,
 		errorCount,
@@ -1118,6 +1229,9 @@ func AutoEnableUserIfDue(userId int) (bool, error) {
 		}
 		if user.Status != common.UserStatusDisabled || user.AutoDisabledUntil <= 0 || user.AutoDisabledUntil > now {
 			return nil
+		}
+		if user.BanCount > 3 {
+			return tx.Model(&User{}).Where("id = ?", user.Id).Update("auto_disabled_until", 0).Error
 		}
 		if err := tx.Model(&User{}).Where("id = ?", user.Id).Updates(map[string]interface{}{
 			"status":              common.UserStatusEnabled,
@@ -1167,6 +1281,84 @@ func AutoEnableDueUsers(limit int) (int64, error) {
 		}
 	}
 	return enabledCount, nil
+}
+
+func IsOpenRegistrationInviteCode(code string) bool {
+	if !common.OpenRegistrationInviteEnabled {
+		return false
+	}
+	configured := strings.TrimSpace(common.OpenRegistrationInviteCode)
+	if configured == "" {
+		return false
+	}
+	return strings.TrimSpace(code) == configured
+}
+
+func GetUserProbationProgress(user *User) map[string]interface{} {
+	formalStatus := UserFormalStatusFormal
+	startedAt := int64(0)
+	checkinDays := 0
+	if user != nil {
+		formalStatus = user.GetFormalStatus()
+		startedAt = user.ProbationStartedAt
+		checkinDays = user.ProbationCheckinDays
+	}
+	now := common.GetTimestamp()
+	remaining := int64(0)
+	if formalStatus == UserFormalStatusProbation && startedAt > 0 {
+		deadline := startedAt + ProbationWindowSeconds
+		if deadline > now {
+			remaining = deadline - now
+		}
+	}
+	return map[string]interface{}{
+		"is_formal":                   formalStatus == UserFormalStatusFormal,
+		"formal_status":               formalStatus,
+		"probation_started_at":        startedAt,
+		"probation_checkin_days":      checkinDays,
+		"probation_checkin_target":    ProbationCheckinTarget,
+		"probation_window_seconds":    ProbationWindowSeconds,
+		"probation_remaining_seconds": remaining,
+	}
+}
+
+func GetUserProbationProgressById(userId int) (map[string]interface{}, error) {
+	user, err := GetUserById(userId, false)
+	if err != nil {
+		return nil, err
+	}
+	return GetUserProbationProgress(user), nil
+}
+
+func UpdateProbationAfterCheckinWithTx(tx *gorm.DB, userId int, now int64) (bool, error) {
+	var user User
+	if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("id = ?", userId).First(&user).Error; err != nil {
+		return false, err
+	}
+	if user.GetFormalStatus() != UserFormalStatusProbation {
+		return false, nil
+	}
+	nextStartedAt := user.ProbationStartedAt
+	nextCheckinDays := user.ProbationCheckinDays
+	if nextStartedAt <= 0 || now > nextStartedAt+ProbationWindowSeconds {
+		nextStartedAt = now
+		nextCheckinDays = 1
+	} else {
+		nextCheckinDays++
+	}
+	updates := map[string]interface{}{
+		"probation_started_at":   nextStartedAt,
+		"probation_checkin_days": nextCheckinDays,
+	}
+	formalized := false
+	if nextCheckinDays >= ProbationCheckinTarget {
+		updates["formal_status"] = UserFormalStatusFormal
+		formalized = true
+	}
+	if err := tx.Model(&User{}).Where("id = ?", userId).Updates(updates).Error; err != nil {
+		return false, err
+	}
+	return formalized, nil
 }
 
 func RootUserExists() bool {

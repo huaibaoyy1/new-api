@@ -82,6 +82,8 @@ const SystemSetting = () => {
     TurnstileSecretKey: '',
     RegisterEnabled: '',
     InvitationCodeEnabled: '',
+    OpenRegistrationInviteEnabled: '',
+    OpenRegistrationInviteCode: '',
     'passkey.enabled': '',
     'passkey.rp_display_name': '',
     'passkey.rp_id': '',
@@ -181,6 +183,7 @@ const SystemSetting = () => {
           case 'TelegramOAuthEnabled':
           case 'RegisterEnabled':
           case 'InvitationCodeEnabled':
+          case 'OpenRegistrationInviteEnabled':
           case 'TurnstileCheckEnabled':
           case 'EmailDomainRestrictionEnabled':
           case 'EmailAliasRestrictionEnabled':
@@ -611,6 +614,27 @@ const SystemSetting = () => {
     }
   };
 
+  const submitOpenRegistrationInvite = async () => {
+    const formValues = formApiRef.current?.getValues() || {};
+    await updateOptions([
+      {
+        key: 'OpenRegistrationInviteCode',
+        value: (
+          formValues.OpenRegistrationInviteCode ??
+          inputs.OpenRegistrationInviteCode ??
+          ''
+        ).trim(),
+      },
+      {
+        key: 'OpenRegistrationInviteEnabled',
+        value: !!(
+          formValues.OpenRegistrationInviteEnabled ??
+          inputs.OpenRegistrationInviteEnabled
+        ),
+      },
+    ]);
+  };
+
   const submitLinuxDOOAuth = async () => {
     const options = [];
 
@@ -1037,6 +1061,34 @@ const SystemSetting = () => {
                       >
                         {t('注册时需要邀请码')}
                       </Form.Checkbox>
+                      <Form.Checkbox
+                        field='OpenRegistrationInviteEnabled'
+                        noLabel
+                        onChange={(e) =>
+                          handleCheckboxChange(
+                            'OpenRegistrationInviteEnabled',
+                            e,
+                          )
+                        }
+                      >
+                        {t('启用开放注册邀请码')}
+                      </Form.Checkbox>
+                      <Form.Input
+                        field='OpenRegistrationInviteCode'
+                        label={t('开放注册邀请码')}
+                        placeholder={t('例如 huaibao-l-free-singup')}
+                        style={{ maxWidth: 420 }}
+                      />
+                      <Text type='secondary' size='small'>
+                        {t(
+                          '使用该邀请码注册的用户不会获得注册赠送额度，需要 7 天内签到 5 天后转正',
+                        )}
+                      </Text>
+                      <div style={{ marginTop: 8, marginBottom: 12 }}>
+                        <Button onClick={submitOpenRegistrationInvite}>
+                          {t('保存开放注册邀请码')}
+                        </Button>
+                      </div>
                       <Form.Checkbox
                         field='TurnstileCheckEnabled'
                         noLabel

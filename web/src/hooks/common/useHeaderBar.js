@@ -50,6 +50,7 @@ export const useHeaderBar = ({ onMobileMenuToggle, drawerOpen }) => {
 
   const isSelfUseMode = statusState?.status?.self_use_mode_enabled || false;
   const docsLink = statusState?.status?.docs_link || '';
+  const gamesEnabled = statusState?.status?.games_enabled === true;
   const isDemoSiteMode = statusState?.status?.demo_site_enabled || false;
 
   // 获取顶栏模块配置
@@ -89,6 +90,8 @@ export const useHeaderBar = ({ onMobileMenuToggle, drawerOpen }) => {
   }, [headerNavModules]);
 
   const isConsoleRoute = location.pathname.startsWith('/console');
+  const isGameRoute =
+    location.pathname === '/games' || location.pathname.startsWith('/games/');
 
   const theme = useTheme();
   const actualTheme = useActualTheme();
@@ -232,8 +235,10 @@ export const useHeaderBar = ({ onMobileMenuToggle, drawerOpen }) => {
     isNewYear,
     isSelfUseMode,
     docsLink,
+    gamesEnabled,
     isDemoSiteMode,
     isConsoleRoute,
+    isGameRoute,
     theme,
     drawerOpen,
     headerNavModules,

@@ -153,7 +153,10 @@ const RegisterForm = () => {
 
   useEffect(() => {
     setShowEmailVerification(!!status?.email_verification);
-    setInvitationCodeEnabled(!!status?.invitation_code_enabled);
+    setInvitationCodeEnabled(
+      !!status?.invitation_code_enabled ||
+        !!status?.open_registration_invite_enabled,
+    );
     if (status?.turnstile_check) {
       setTurnstileEnabled(true);
       setTurnstileSiteKey(status.turnstile_site_key);

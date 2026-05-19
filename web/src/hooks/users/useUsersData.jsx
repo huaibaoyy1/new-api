@@ -41,6 +41,8 @@ export const useUsersData = () => {
     consumeStatus: 'all',
     checkinStatus: 'all',
     userStatus: 0,
+    formalStatus: 0,
+    minBanCount: 0,
     riskLevel: 'all',
     minErrorRate: 0,
     minStatus429: 0,
@@ -78,6 +80,8 @@ export const useUsersData = () => {
     consumeStatus: 'all',
     checkinStatus: 'all',
     userStatus: 0,
+    formalStatus: 0,
+    minBanCount: 0,
     riskLevel: 'all',
     minErrorRate: 0,
     minStatus429: 0,
@@ -96,6 +100,8 @@ export const useUsersData = () => {
       consumeStatus: formValues.consumeStatus || 'all',
       checkinStatus: formValues.checkinStatus || 'all',
       userStatus: Number(formValues.userStatus || 0),
+      formalStatus: Number(formValues.formalStatus || 0),
+      minBanCount: Number(formValues.minBanCount || 0),
       riskLevel: formValues.riskLevel || 'all',
       minErrorRate: Number(formValues.minErrorRate || 0),
       minStatus429: Number(formValues.minStatus429 || 0),
@@ -109,7 +115,7 @@ export const useUsersData = () => {
   ) => {
     try {
       const res = await API.get(
-        `/api/user/activity_summary?keyword=${searchKeyword}&group=${searchGroup}&days=${filters.days}&consume_status=${filters.consumeStatus}&checkin_status=${filters.checkinStatus}&user_status=${filters.userStatus || 0}&risk_level=${filters.riskLevel || 'all'}&min_error_rate=${filters.minErrorRate || 0}&min_status_429=${filters.minStatus429 || 0}`,
+        `/api/user/activity_summary?keyword=${searchKeyword}&group=${searchGroup}&days=${filters.days}&consume_status=${filters.consumeStatus}&checkin_status=${filters.checkinStatus}&user_status=${filters.userStatus || 0}&formal_status=${filters.formalStatus || 0}&min_ban_count=${filters.minBanCount || 0}&risk_level=${filters.riskLevel || 'all'}&min_error_rate=${filters.minErrorRate || 0}&min_status_429=${filters.minStatus429 || 0}`,
       );
       const { success, message, data } = res.data;
       if (success) {
@@ -144,7 +150,7 @@ export const useUsersData = () => {
     const filters = nextFilters || activityFilters;
     setActivityFilters(filters);
     const res = await API.get(
-      `/api/user/?p=${startIdx}&page_size=${pageSize}&days=${filters.days}&consume_status=${filters.consumeStatus}&checkin_status=${filters.checkinStatus}&user_status=${filters.userStatus || 0}&risk_level=${filters.riskLevel || 'all'}&min_error_rate=${filters.minErrorRate || 0}&min_status_429=${filters.minStatus429 || 0}`,
+      `/api/user/?p=${startIdx}&page_size=${pageSize}&days=${filters.days}&consume_status=${filters.consumeStatus}&checkin_status=${filters.checkinStatus}&user_status=${filters.userStatus || 0}&formal_status=${filters.formalStatus || 0}&min_ban_count=${filters.minBanCount || 0}&risk_level=${filters.riskLevel || 'all'}&min_error_rate=${filters.minErrorRate || 0}&min_status_429=${filters.minStatus429 || 0}`,
     );
     const { success, message, data } = res.data;
     if (success) {
@@ -178,6 +184,8 @@ export const useUsersData = () => {
         consumeStatus: formValues.consumeStatus,
         checkinStatus: formValues.checkinStatus,
         userStatus: formValues.userStatus,
+        formalStatus: formValues.formalStatus,
+        minBanCount: formValues.minBanCount,
         riskLevel: formValues.riskLevel,
         minErrorRate: formValues.minErrorRate,
         minStatus429: formValues.minStatus429,
@@ -192,7 +200,7 @@ export const useUsersData = () => {
     }
     setSearching(true);
     const res = await API.get(
-      `/api/user/search?keyword=${searchKeyword}&group=${searchGroup}&p=${startIdx}&page_size=${pageSize}&days=${filters.days}&consume_status=${filters.consumeStatus}&checkin_status=${filters.checkinStatus}&user_status=${filters.userStatus || 0}&risk_level=${filters.riskLevel || 'all'}&min_error_rate=${filters.minErrorRate || 0}&min_status_429=${filters.minStatus429 || 0}`,
+      `/api/user/search?keyword=${searchKeyword}&group=${searchGroup}&p=${startIdx}&page_size=${pageSize}&days=${filters.days}&consume_status=${filters.consumeStatus}&checkin_status=${filters.checkinStatus}&user_status=${filters.userStatus || 0}&formal_status=${filters.formalStatus || 0}&min_ban_count=${filters.minBanCount || 0}&risk_level=${filters.riskLevel || 'all'}&min_error_rate=${filters.minErrorRate || 0}&min_status_429=${filters.minStatus429 || 0}`,
     );
     const { success, message, data } = res.data;
     if (success) {
@@ -228,7 +236,13 @@ export const useUsersData = () => {
           if (action === 'delete') {
             return { ...u, DeletedAt: new Date() };
           }
-          return { ...u, status: user.status, role: user.role };
+          return {
+            ...u,
+            status: user.status,
+            role: user.role,
+            ban_count: user.ban_count,
+            auto_disabled_until: user.auto_disabled_until,
+          };
         }
         return u;
       });
@@ -285,6 +299,8 @@ export const useUsersData = () => {
       consumeStatus,
       checkinStatus,
       userStatus,
+      formalStatus,
+      minBanCount,
       riskLevel,
       minErrorRate,
       minStatus429,
@@ -294,6 +310,8 @@ export const useUsersData = () => {
       consumeStatus,
       checkinStatus,
       userStatus,
+      formalStatus,
+      minBanCount,
       riskLevel,
       minErrorRate,
       minStatus429,
@@ -367,6 +385,8 @@ export const useUsersData = () => {
       consumeStatus,
       checkinStatus,
       userStatus,
+      formalStatus,
+      minBanCount,
       riskLevel,
       minErrorRate,
       minStatus429,
@@ -380,6 +400,8 @@ export const useUsersData = () => {
           consume_status: consumeStatus || 'all',
           checkin_status: checkinStatus || 'all',
           user_status: String(userStatus || 0),
+          formal_status: String(formalStatus || 0),
+          min_ban_count: String(minBanCount || 0),
           risk_level: riskLevel || 'all',
           min_error_rate: String(minErrorRate || 0),
           min_status_429: String(minStatus429 || 0),
@@ -477,6 +499,8 @@ export const useUsersData = () => {
       consumeStatus,
       checkinStatus,
       userStatus,
+      formalStatus,
+      minBanCount,
       riskLevel,
       minErrorRate,
       minStatus429,
@@ -486,6 +510,8 @@ export const useUsersData = () => {
       consumeStatus,
       checkinStatus,
       userStatus,
+      formalStatus,
+      minBanCount,
       riskLevel,
       minErrorRate,
       minStatus429,

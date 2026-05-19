@@ -51,6 +51,8 @@ var TelegramOAuthEnabled = false
 var TurnstileCheckEnabled = false
 var RegisterEnabled = true
 var InvitationCodeEnabled = false
+var OpenRegistrationInviteEnabled = false
+var OpenRegistrationInviteCode = ""
 
 var EmailDomainRestrictionEnabled = false // 是否启用邮箱域名限制
 var EmailAliasRestrictionEnabled = false  // 是否启用邮箱别名限制
@@ -191,6 +193,21 @@ var (
 	SearchRateLimitEnable         = true
 	SearchRateLimitNum            = 10
 	SearchRateLimitDuration int64 = 60
+
+	// Per-user game draw rate limit (applies after authentication, keyed by user ID)
+	GameDrawRateLimitEnable         = true
+	GameDrawRateLimitNum            = 120
+	GameDrawRateLimitDuration int64 = 60
+
+	// Per-user golden poker rate limit (applies after authentication, keyed by user ID)
+	GamePokerRateLimitEnable         = true
+	GamePokerRateLimitNum            = 60
+	GamePokerRateLimitDuration int64 = 60
+
+	// Per-user quota treasure rate limit (applies after authentication, keyed by user ID)
+	GameTreasureRateLimitEnable         = true
+	GameTreasureRateLimitNum            = 60
+	GameTreasureRateLimitDuration int64 = 60
 )
 
 var RateLimitKeyExpirationDuration = 20 * time.Minute

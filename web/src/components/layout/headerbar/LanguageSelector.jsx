@@ -21,7 +21,16 @@ import React from 'react';
 import { Button, Dropdown } from '@douyinfe/semi-ui';
 import { Languages } from 'lucide-react';
 
-const LanguageSelector = ({ currentLang, onLanguageChange, t }) => {
+const LanguageSelector = ({
+  currentLang,
+  onLanguageChange,
+  isGameRoute,
+  t,
+}) => {
+  const buttonClassName = isGameRoute
+    ? '!p-1.5 !text-slate-950 focus:!bg-slate-200 !rounded-full !bg-slate-100 hover:!bg-slate-200'
+    : '!p-1.5 !text-current focus:!bg-semi-color-fill-1 dark:focus:!bg-gray-700 !rounded-full !bg-semi-color-fill-0 dark:!bg-semi-color-fill-1 hover:!bg-semi-color-fill-1 dark:hover:!bg-semi-color-fill-2';
+
   return (
     <Dropdown
       position='bottomRight'
@@ -77,7 +86,7 @@ const LanguageSelector = ({ currentLang, onLanguageChange, t }) => {
         aria-label={t('common.changeLanguage')}
         theme='borderless'
         type='tertiary'
-        className='!p-1.5 !text-current focus:!bg-semi-color-fill-1 dark:focus:!bg-gray-700 !rounded-full !bg-semi-color-fill-0 dark:!bg-semi-color-fill-1 hover:!bg-semi-color-fill-1 dark:hover:!bg-semi-color-fill-2'
+        className={buttonClassName}
       />
     </Dropdown>
   );

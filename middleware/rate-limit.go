@@ -203,3 +203,30 @@ func SearchRateLimit() func(c *gin.Context) {
 	}
 	return userRateLimitFactory(common.SearchRateLimitNum, common.SearchRateLimitDuration, "SR")
 }
+
+// GameDrawRateLimit returns a per-user rate limiter for game draw endpoints.
+// Configurable via GAME_DRAW_RATE_LIMIT_ENABLE / GAME_DRAW_RATE_LIMIT / GAME_DRAW_RATE_LIMIT_DURATION.
+func GameDrawRateLimit() func(c *gin.Context) {
+	if !common.GameDrawRateLimitEnable {
+		return defNext
+	}
+	return userRateLimitFactory(common.GameDrawRateLimitNum, common.GameDrawRateLimitDuration, "GD")
+}
+
+// GamePokerRateLimit returns a per-user rate limiter for golden poker endpoints.
+// Configurable via GAME_POKER_RATE_LIMIT_ENABLE / GAME_POKER_RATE_LIMIT / GAME_POKER_RATE_LIMIT_DURATION.
+func GamePokerRateLimit() func(c *gin.Context) {
+	if !common.GamePokerRateLimitEnable {
+		return defNext
+	}
+	return userRateLimitFactory(common.GamePokerRateLimitNum, common.GamePokerRateLimitDuration, "GP")
+}
+
+// GameTreasureRateLimit returns a per-user rate limiter for quota treasure endpoints.
+// Configurable via GAME_TREASURE_RATE_LIMIT_ENABLE / GAME_TREASURE_RATE_LIMIT / GAME_TREASURE_RATE_LIMIT_DURATION.
+func GameTreasureRateLimit() func(c *gin.Context) {
+	if !common.GameTreasureRateLimitEnable {
+		return defNext
+	}
+	return userRateLimitFactory(common.GameTreasureRateLimitNum, common.GameTreasureRateLimitDuration, "GT")
+}

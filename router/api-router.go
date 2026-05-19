@@ -22,10 +22,10 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.POST("/setup", controller.PostSetup)
 		apiRouter.GET("/status", middleware.TryUserAuth(), controller.GetStatus)
 		apiRouter.GET("/uptime/status", controller.GetUptimeKumaStatus)
-		apiRouter.GET("/models", middleware.UserAuth(), controller.DashboardListModels)
+		apiRouter.GET("/models", middleware.UserAuth(), middleware.FormalUserRequired(), controller.DashboardListModels)
 		apiRouter.GET("/status/test", middleware.AdminAuth(), controller.TestStatus)
 		apiRouter.GET("/notice", controller.GetNotice)
-		apiRouter.POST("/announcements/read", middleware.UserAuth(), controller.MarkAnnouncementRead)
+		apiRouter.POST("/announcements/read", middleware.UserAuth(), middleware.FormalUserRequired(), controller.MarkAnnouncementRead)
 		apiRouter.GET("/announcements/:id/read-status", middleware.AdminAuth(), controller.GetAnnouncementReadStatus)
 		apiRouter.GET("/user-agreement", controller.GetUserAgreement)
 		apiRouter.GET("/privacy-policy", controller.GetPrivacyPolicy)
@@ -55,7 +55,7 @@ func SetApiRouter(router *gin.Engine) {
 		//apiRouter.POST("/waffo-pancake/webhook", controller.WaffoPancakeWebhook)
 
 		// Universal secure verification routes
-		apiRouter.POST("/verify", middleware.UserAuth(), middleware.CriticalRateLimit(), controller.UniversalVerify)
+		apiRouter.POST("/verify", middleware.UserAuth(), middleware.FormalUserRequired(), middleware.CriticalRateLimit(), controller.UniversalVerify)
 
 		userRoute := apiRouter.Group("/user")
 		{
@@ -73,48 +73,48 @@ func SetApiRouter(router *gin.Engine) {
 			selfRoute := userRoute.Group("/")
 			selfRoute.Use(middleware.UserAuth())
 			{
-				selfRoute.GET("/self/groups", controller.GetUserGroups)
+				selfRoute.GET("/self/groups", middleware.FormalUserRequired(), controller.GetUserGroups)
 				selfRoute.GET("/self", controller.GetSelf)
-				selfRoute.GET("/models", controller.GetUserModels)
-				selfRoute.PUT("/self", controller.UpdateSelf)
-				selfRoute.DELETE("/self", controller.DeleteSelf)
-				selfRoute.GET("/token", controller.GenerateAccessToken)
-				selfRoute.GET("/passkey", controller.PasskeyStatus)
-				selfRoute.POST("/passkey/register/begin", controller.PasskeyRegisterBegin)
-				selfRoute.POST("/passkey/register/finish", controller.PasskeyRegisterFinish)
-				selfRoute.POST("/passkey/verify/begin", controller.PasskeyVerifyBegin)
-				selfRoute.POST("/passkey/verify/finish", controller.PasskeyVerifyFinish)
-				selfRoute.DELETE("/passkey", controller.PasskeyDelete)
-				selfRoute.GET("/aff", controller.GetAffCode)
-				selfRoute.GET("/topup/info", controller.GetTopUpInfo)
-				selfRoute.GET("/topup/self", controller.GetUserTopUps)
-				selfRoute.POST("/topup", middleware.CriticalRateLimit(), controller.TopUp)
-				selfRoute.POST("/pay", middleware.CriticalRateLimit(), controller.RequestEpay)
-				selfRoute.POST("/amount", controller.RequestAmount)
-				selfRoute.POST("/stripe/pay", middleware.CriticalRateLimit(), controller.RequestStripePay)
-				selfRoute.POST("/stripe/amount", controller.RequestStripeAmount)
-				selfRoute.POST("/creem/pay", middleware.CriticalRateLimit(), controller.RequestCreemPay)
-				selfRoute.POST("/waffo/amount", controller.RequestWaffoAmount)
-				selfRoute.POST("/waffo/pay", middleware.CriticalRateLimit(), controller.RequestWaffoPay)
+				selfRoute.GET("/models", middleware.FormalUserRequired(), controller.GetUserModels)
+				selfRoute.PUT("/self", middleware.FormalUserRequired(), controller.UpdateSelf)
+				selfRoute.DELETE("/self", middleware.FormalUserRequired(), controller.DeleteSelf)
+				selfRoute.GET("/token", middleware.FormalUserRequired(), controller.GenerateAccessToken)
+				selfRoute.GET("/passkey", middleware.FormalUserRequired(), controller.PasskeyStatus)
+				selfRoute.POST("/passkey/register/begin", middleware.FormalUserRequired(), controller.PasskeyRegisterBegin)
+				selfRoute.POST("/passkey/register/finish", middleware.FormalUserRequired(), controller.PasskeyRegisterFinish)
+				selfRoute.POST("/passkey/verify/begin", middleware.FormalUserRequired(), controller.PasskeyVerifyBegin)
+				selfRoute.POST("/passkey/verify/finish", middleware.FormalUserRequired(), controller.PasskeyVerifyFinish)
+				selfRoute.DELETE("/passkey", middleware.FormalUserRequired(), controller.PasskeyDelete)
+				selfRoute.GET("/aff", middleware.FormalUserRequired(), controller.GetAffCode)
+				selfRoute.GET("/topup/info", middleware.FormalUserRequired(), controller.GetTopUpInfo)
+				selfRoute.GET("/topup/self", middleware.FormalUserRequired(), controller.GetUserTopUps)
+				selfRoute.POST("/topup", middleware.FormalUserRequired(), middleware.CriticalRateLimit(), controller.TopUp)
+				selfRoute.POST("/pay", middleware.FormalUserRequired(), middleware.CriticalRateLimit(), controller.RequestEpay)
+				selfRoute.POST("/amount", middleware.FormalUserRequired(), controller.RequestAmount)
+				selfRoute.POST("/stripe/pay", middleware.FormalUserRequired(), middleware.CriticalRateLimit(), controller.RequestStripePay)
+				selfRoute.POST("/stripe/amount", middleware.FormalUserRequired(), controller.RequestStripeAmount)
+				selfRoute.POST("/creem/pay", middleware.FormalUserRequired(), middleware.CriticalRateLimit(), controller.RequestCreemPay)
+				selfRoute.POST("/waffo/amount", middleware.FormalUserRequired(), controller.RequestWaffoAmount)
+				selfRoute.POST("/waffo/pay", middleware.FormalUserRequired(), middleware.CriticalRateLimit(), controller.RequestWaffoPay)
 				//selfRoute.POST("/waffo-pancake/amount", controller.RequestWaffoPancakeAmount)
 				//selfRoute.POST("/waffo-pancake/pay", middleware.CriticalRateLimit(), controller.RequestWaffoPancakePay)
-				selfRoute.POST("/aff_transfer", controller.TransferAffQuota)
-				selfRoute.PUT("/setting", controller.UpdateUserSetting)
+				selfRoute.POST("/aff_transfer", middleware.FormalUserRequired(), controller.TransferAffQuota)
+				selfRoute.PUT("/setting", middleware.FormalUserRequired(), controller.UpdateUserSetting)
 
 				// 2FA routes
-				selfRoute.GET("/2fa/status", controller.Get2FAStatus)
-				selfRoute.POST("/2fa/setup", controller.Setup2FA)
-				selfRoute.POST("/2fa/enable", controller.Enable2FA)
-				selfRoute.POST("/2fa/disable", controller.Disable2FA)
-				selfRoute.POST("/2fa/backup_codes", controller.RegenerateBackupCodes)
+				selfRoute.GET("/2fa/status", middleware.FormalUserRequired(), controller.Get2FAStatus)
+				selfRoute.POST("/2fa/setup", middleware.FormalUserRequired(), controller.Setup2FA)
+				selfRoute.POST("/2fa/enable", middleware.FormalUserRequired(), controller.Enable2FA)
+				selfRoute.POST("/2fa/disable", middleware.FormalUserRequired(), controller.Disable2FA)
+				selfRoute.POST("/2fa/backup_codes", middleware.FormalUserRequired(), controller.RegenerateBackupCodes)
 
 				// Check-in routes
 				selfRoute.GET("/checkin", controller.GetCheckinStatus)
 				selfRoute.POST("/checkin", middleware.TurnstileCheckFresh(), controller.DoCheckin)
 
 				// Custom OAuth bindings
-				selfRoute.GET("/oauth/bindings", controller.GetUserOAuthBindings)
-				selfRoute.DELETE("/oauth/bindings/:provider_id", controller.UnbindCustomOAuth)
+				selfRoute.GET("/oauth/bindings", middleware.FormalUserRequired(), controller.GetUserOAuthBindings)
+				selfRoute.DELETE("/oauth/bindings/:provider_id", middleware.FormalUserRequired(), controller.UnbindCustomOAuth)
 			}
 
 			adminRoute := userRoute.Group("/")
@@ -147,7 +147,7 @@ func SetApiRouter(router *gin.Engine) {
 
 		// Subscription billing (plans, purchase, admin management)
 		subscriptionRoute := apiRouter.Group("/subscription")
-		subscriptionRoute.Use(middleware.UserAuth())
+		subscriptionRoute.Use(middleware.UserAuth(), middleware.FormalUserRequired())
 		{
 			subscriptionRoute.GET("/plans", controller.GetSubscriptionPlans)
 			subscriptionRoute.GET("/self", controller.GetSubscriptionSelf)
@@ -259,7 +259,7 @@ func SetApiRouter(router *gin.Engine) {
 			channelRoute.POST("/upstream_updates/detect_all", controller.DetectAllChannelUpstreamModelUpdates)
 		}
 		tokenRoute := apiRouter.Group("/token")
-		tokenRoute.Use(middleware.UserAuth())
+		tokenRoute.Use(middleware.UserAuth(), middleware.FormalUserRequired())
 		{
 			tokenRoute.GET("/", controller.GetAllTokens)
 			tokenRoute.GET("/search", middleware.SearchRateLimit(), controller.SearchTokens)
@@ -297,16 +297,16 @@ func SetApiRouter(router *gin.Engine) {
 		logRoute.GET("/", middleware.AdminAuth(), controller.GetAllLogs)
 		logRoute.DELETE("/", middleware.AdminAuth(), controller.DeleteHistoryLogs)
 		logRoute.GET("/stat", middleware.AdminAuth(), controller.GetLogsStat)
-		logRoute.GET("/self/stat", middleware.UserAuth(), controller.GetLogsSelfStat)
+		logRoute.GET("/self/stat", middleware.UserAuth(), middleware.FormalUserRequired(), controller.GetLogsSelfStat)
 		logRoute.GET("/channel_affinity_usage_cache", middleware.AdminAuth(), controller.GetChannelAffinityUsageCacheStats)
 		logRoute.GET("/search", middleware.AdminAuth(), controller.SearchAllLogs)
-		logRoute.GET("/self", middleware.UserAuth(), controller.GetUserLogs)
-		logRoute.GET("/self/search", middleware.UserAuth(), middleware.SearchRateLimit(), controller.SearchUserLogs)
+		logRoute.GET("/self", middleware.UserAuth(), middleware.FormalUserRequired(), controller.GetUserLogs)
+		logRoute.GET("/self/search", middleware.UserAuth(), middleware.FormalUserRequired(), middleware.SearchRateLimit(), controller.SearchUserLogs)
 
 		dataRoute := apiRouter.Group("/data")
 		dataRoute.GET("/", middleware.AdminAuth(), controller.GetAllQuotaDates)
 		dataRoute.GET("/users", middleware.AdminAuth(), controller.GetQuotaDatesByUser)
-		dataRoute.GET("/self", middleware.UserAuth(), controller.GetUserQuotaDates)
+		dataRoute.GET("/self", middleware.UserAuth(), middleware.FormalUserRequired(), controller.GetUserQuotaDates)
 
 		logRoute.Use(middleware.CORS(), middleware.CriticalRateLimit())
 		{
@@ -316,6 +316,33 @@ func SetApiRouter(router *gin.Engine) {
 		groupRoute.Use(middleware.AdminAuth())
 		{
 			groupRoute.GET("/", controller.GetGroups)
+		}
+
+		gamesRoute := apiRouter.Group("/games")
+		gamesRoute.Use(middleware.UserAuth(), middleware.FormalUserRequired())
+		{
+			magicCubeRoute := gamesRoute.Group("/magic-cube")
+			{
+				magicCubeRoute.GET("/status", controller.GetMagicCubeStatus)
+				magicCubeRoute.GET("/exchanges", controller.GetMagicCubeExchangeRecords)
+				magicCubeRoute.POST("/draw", middleware.GameDrawRateLimit(), controller.DrawMagicCube)
+				magicCubeRoute.POST("/milestones/claim", middleware.CriticalRateLimit(), controller.ClaimMagicCubeMilestone)
+				magicCubeRoute.POST("/exchange", middleware.CriticalRateLimit(), controller.ExchangeMagicCubeItem)
+			}
+			goldenPokerRoute := gamesRoute.Group("/golden-poker")
+			{
+				goldenPokerRoute.GET("/status", controller.GetGoldenPokerStatus)
+				goldenPokerRoute.POST("/rounds", middleware.GamePokerRateLimit(), controller.CreateGoldenPokerRound)
+				goldenPokerRoute.POST("/rounds/:id/swap", middleware.GamePokerRateLimit(), controller.SwapGoldenPokerCard)
+				goldenPokerRoute.POST("/rounds/:id/settle", middleware.GamePokerRateLimit(), controller.SettleGoldenPokerRound)
+			}
+			quotaTreasureRoute := gamesRoute.Group("/quota-treasure")
+			{
+				quotaTreasureRoute.GET("/status", controller.GetQuotaTreasureStatus)
+				quotaTreasureRoute.POST("/rounds", middleware.GameTreasureRateLimit(), controller.CreateQuotaTreasureRound)
+				quotaTreasureRoute.POST("/rounds/:id/pick", middleware.GameTreasureRateLimit(), controller.PickQuotaTreasureNode)
+				quotaTreasureRoute.POST("/rounds/:id/cashout", middleware.GameTreasureRateLimit(), controller.CashoutQuotaTreasureRound)
+			}
 		}
 
 		prefillGroupRoute := apiRouter.Group("/prefill_group")
@@ -341,12 +368,12 @@ func SetApiRouter(router *gin.Engine) {
 		}
 
 		mjRoute := apiRouter.Group("/mj")
-		mjRoute.GET("/self", middleware.UserAuth(), controller.GetUserMidjourney)
+		mjRoute.GET("/self", middleware.UserAuth(), middleware.FormalUserRequired(), controller.GetUserMidjourney)
 		mjRoute.GET("/", middleware.AdminAuth(), controller.GetAllMidjourney)
 
 		taskRoute := apiRouter.Group("/task")
 		{
-			taskRoute.GET("/self", middleware.UserAuth(), controller.GetUserTask)
+			taskRoute.GET("/self", middleware.UserAuth(), middleware.FormalUserRequired(), controller.GetUserTask)
 			taskRoute.GET("/", middleware.AdminAuth(), controller.GetAllTask)
 		}
 

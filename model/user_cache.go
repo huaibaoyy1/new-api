@@ -15,13 +15,27 @@ import (
 
 // UserBase struct remains the same as it represents the cached data structure
 type UserBase struct {
-	Id       int    `json:"id"`
-	Group    string `json:"group"`
-	Email    string `json:"email"`
-	Quota    int    `json:"quota"`
-	Status   int    `json:"status"`
-	Username string `json:"username"`
-	Setting  string `json:"setting"`
+	Id                   int    `json:"id"`
+	Group                string `json:"group"`
+	Email                string `json:"email"`
+	Quota                int    `json:"quota"`
+	Status               int    `json:"status"`
+	Username             string `json:"username"`
+	Setting              string `json:"setting"`
+	FormalStatus         int    `json:"formal_status"`
+	ProbationStartedAt   int64  `json:"probation_started_at"`
+	ProbationCheckinDays int    `json:"probation_checkin_days"`
+}
+
+func (user *UserBase) GetFormalStatus() int {
+	if user.FormalStatus == 0 {
+		return UserFormalStatusFormal
+	}
+	return user.FormalStatus
+}
+
+func (user *UserBase) IsFormal() bool {
+	return user.GetFormalStatus() == UserFormalStatusFormal
 }
 
 func (user *UserBase) WriteContext(c *gin.Context) {
@@ -104,16 +118,7 @@ func GetUserCache(userId int) (userCache *UserBase, err error) {
 		return nil, err // Return nil and error if DB lookup fails
 	}
 
-	// Create cache object from user data
-	userCache = &UserBase{
-		Id:       user.Id,
-		Group:    user.Group,
-		Quota:    user.Quota,
-		Status:   user.Status,
-		Username: user.Username,
-		Setting:  user.Setting,
-		Email:    user.Email,
-	}
+	userCache = user.ToBaseUser()
 
 	return userCache, nil
 }

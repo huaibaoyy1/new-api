@@ -38,6 +38,7 @@ const ActionButtons = ({
   isSelfUseMode,
   logout,
   navigate,
+  isGameRoute,
   t,
 }) => {
   return (
@@ -47,14 +48,21 @@ const ActionButtons = ({
       <NotificationButton
         unreadCount={unreadCount}
         onNoticeOpen={onNoticeOpen}
+        isGameRoute={isGameRoute}
         t={t}
       />
 
-      <ThemeToggle theme={theme} onThemeToggle={onThemeToggle} t={t} />
+      <ThemeToggle
+        theme={theme}
+        onThemeToggle={onThemeToggle}
+        isGameRoute={isGameRoute}
+        t={t}
+      />
 
       <LanguageSelector
         currentLang={currentLang}
         onLanguageChange={onLanguageChange}
+        isGameRoute={isGameRoute}
         t={t}
       />
 
@@ -65,6 +73,7 @@ const ActionButtons = ({
         isSelfUseMode={isSelfUseMode}
         logout={logout}
         navigate={navigate}
+        isGameRoute={isGameRoute}
         t={t}
       />
     </div>

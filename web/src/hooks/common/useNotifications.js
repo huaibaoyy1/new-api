@@ -21,11 +21,15 @@ import { useState, useEffect } from 'react';
 
 const NOTICE_READ_KEYS_STORAGE_KEY = 'notice_read_keys';
 
-export const useNotifications = (statusState) => {
+export const useNotifications = (statusState, userState) => {
   const [noticeVisible, setNoticeVisible] = useState(false);
+  const [forceNotice, setForceNotice] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
   const announcements = statusState?.status?.announcements || [];
+  const isLoggedIn = Boolean(userState?.user?.id);
+  const forceAnnouncementEnabled =
+    statusState?.status?.force_announcement_enabled ?? true;
 
   const getAnnouncementKey = (a) =>
     `${a?.id || ''}-${a?.publishDate || ''}-${(a?.content || '').slice(0, 30)}`;
@@ -55,20 +59,30 @@ export const useNotifications = (statusState) => {
   };
 
   useEffect(() => {
-    setUnreadCount(calculateUnreadCount());
-  }, [announcements]);
+    const nextUnreadCount = calculateUnreadCount();
+    setUnreadCount(nextUnreadCount);
+    if (forceAnnouncementEnabled && nextUnreadCount > 0) {
+      setForceNotice(isLoggedIn);
+      setNoticeVisible(true);
+    } else {
+      setForceNotice(false);
+    }
+  }, [announcements, isLoggedIn, forceAnnouncementEnabled]);
 
   const handleNoticeOpen = () => {
+    setForceNotice(false);
     setNoticeVisible(true);
   };
 
   const handleNoticeClose = () => {
     setNoticeVisible(false);
+    setForceNotice(false);
     setUnreadCount(calculateUnreadCount());
   };
 
   return {
     noticeVisible,
+    forceNotice,
     unreadCount,
     announcements,
     handleNoticeOpen,

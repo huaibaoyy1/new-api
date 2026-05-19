@@ -89,6 +89,24 @@ const renderType = (type, t) => {
   );
 };
 
+const renderSource = (record, t) => {
+  if (!record.user_id) {
+    return <div>{t('无')}</div>;
+  }
+
+  const isMagicCube = String(record.name || '').startsWith('幸运魔方补给站');
+  return (
+    <div className='flex flex-col gap-1'>
+      <Tag color={isMagicCube ? 'purple' : 'grey'} shape='circle'>
+        {isMagicCube ? t('幸运魔方补给站') : t('后台生成')}
+      </Tag>
+      <span className='text-xs text-semi-color-text-2'>
+        {t('用户ID')}: {record.user_id}
+      </span>
+    </div>
+  );
+};
+
 /**
  * Get redemption code table column definitions
  */
@@ -148,6 +166,13 @@ export const getRedemptionsColumns = ({
             </Tag>
           </div>
         );
+      },
+    },
+    {
+      title: t('来源/生成人'),
+      dataIndex: 'user_id',
+      render: (text, record) => {
+        return renderSource(record, t);
       },
     },
     {

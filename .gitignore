@@ -22,6 +22,7 @@ tiktoken_cache
 web/bun.lock
 plans
 .claude
+go-test/
 
 electron/node_modules
 electron/dist
@@ -32,3 +33,7 @@ data/
 .test
 token_estimator_test.go
 skills-lock.json
+.gotmp
+one-api.db
+one-api.db-shm
+one-api.db-wal

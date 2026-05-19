@@ -22,8 +22,11 @@ import { Button, Dropdown } from '@douyinfe/semi-ui';
 import { Sun, Moon, Monitor } from 'lucide-react';
 import { useActualTheme } from '../../../context/Theme';
 
-const ThemeToggle = ({ theme, onThemeToggle, t }) => {
+const ThemeToggle = ({ theme, onThemeToggle, isGameRoute, t }) => {
   const actualTheme = useActualTheme();
+  const buttonClassName = isGameRoute
+    ? '!p-1.5 !text-slate-950 focus:!bg-slate-200 !rounded-full !bg-slate-100 hover:!bg-slate-200'
+    : '!p-1.5 !text-current focus:!bg-semi-color-fill-1 !rounded-full !bg-semi-color-fill-0 hover:!bg-semi-color-fill-1';
 
   const themeOptions = useMemo(
     () => [
@@ -101,7 +104,7 @@ const ThemeToggle = ({ theme, onThemeToggle, t }) => {
           aria-label={t('切换主题')}
           theme='borderless'
           type='tertiary'
-          className='!p-1.5 !text-current focus:!bg-semi-color-fill-1 !rounded-full !bg-semi-color-fill-0 hover:!bg-semi-color-fill-1'
+          className={buttonClassName}
         />
       </span>
     </Dropdown>

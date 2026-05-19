@@ -31,6 +31,7 @@ const HeaderLogo = ({
   systemName,
   isSelfUseMode,
   isDemoSiteMode,
+  isGameRoute,
   t,
 }) => {
   if (isMobile && isConsoleRoute) {
@@ -57,7 +58,7 @@ const HeaderLogo = ({
           >
             <Typography.Title
               heading={4}
-              className='!text-lg !font-semibold !mb-0'
+              className={`!text-lg !font-semibold !mb-0 ${isGameRoute ? '!text-slate-950' : ''}`}
             >
               {systemName}
             </Typography.Title>
