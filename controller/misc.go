@@ -154,6 +154,8 @@ func GetStatus(c *gin.Context) {
 		"game_one_enabled":           common.GetEnvOrDefaultBool("GAME_ONE_ENABLED", true),
 		"game_two_enabled":           common.GetEnvOrDefaultBool("GAME_TWO_ENABLED", true),
 		"game_three_enabled":         common.GetEnvOrDefaultBool("GAME_THREE_ENABLED", true),
+		"game_four_enabled":          common.GetEnvOrDefaultBool("GAME_FOUR_ENABLED", true),
+		"game_five_enabled":          common.GetEnvOrDefaultBool("GAME_FIVE_ENABLED", true),
 		"faq_enabled":                cs.FAQEnabled,
 
 		// 模块管理配置

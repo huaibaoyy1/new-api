@@ -138,6 +138,14 @@ func InitEnv() {
 	GameTreasureRateLimitEnable = GetEnvOrDefaultBool("GAME_TREASURE_RATE_LIMIT_ENABLE", true)
 	GameTreasureRateLimitNum = GetEnvOrDefault("GAME_TREASURE_RATE_LIMIT", 60)
 	GameTreasureRateLimitDuration = int64(GetEnvOrDefault("GAME_TREASURE_RATE_LIMIT_DURATION", 60))
+
+	GameDice21RateLimitEnable = GetEnvOrDefaultBool("GAME_DICE21_RATE_LIMIT_ENABLE", true)
+	GameDice21RateLimitNum = GetEnvOrDefault("GAME_DICE21_RATE_LIMIT", 60)
+	GameDice21RateLimitDuration = int64(GetEnvOrDefault("GAME_DICE21_RATE_LIMIT_DURATION", 60))
+
+	GameNiuniuRateLimitEnable = GetEnvOrDefaultBool("GAME_NIUNIU_RATE_LIMIT_ENABLE", true)
+	GameNiuniuRateLimitNum = GetEnvOrDefault("GAME_NIUNIU_RATE_LIMIT", 60)
+	GameNiuniuRateLimitDuration = int64(GetEnvOrDefault("GAME_NIUNIU_RATE_LIMIT_DURATION", 60))
 	initConstantEnv()
 }
 

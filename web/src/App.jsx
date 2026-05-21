@@ -59,6 +59,8 @@ const Games = lazy(() => import('./pages/Games'));
 const MagicCube = lazy(() => import('./pages/Games/MagicCube'));
 const GoldenPoker = lazy(() => import('./pages/Games/GoldenPoker'));
 const QuotaTreasure = lazy(() => import('./pages/Games/QuotaTreasure'));
+const Dice21 = lazy(() => import('./pages/Games/Dice21'));
+const QuotaNiuniu = lazy(() => import('./pages/Games/QuotaNiuniu'));
 const UserAgreement = lazy(() => import('./pages/UserAgreement'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 
@@ -418,7 +420,7 @@ function App() {
             !statusLoaded ? (
               <Loading />
             ) : gamesEnabled &&
-              statusState?.status?.game_one_enabled === true ? (
+              statusState?.status?.game_one_enabled !== false ? (
               <PrivateRoute>
                 <GameBrowserGuard>
                   <Suspense
@@ -440,7 +442,7 @@ function App() {
             !statusLoaded ? (
               <Loading />
             ) : gamesEnabled &&
-              statusState?.status?.game_two_enabled === true ? (
+              statusState?.status?.game_two_enabled !== false ? (
               <PrivateRoute>
                 <GameBrowserGuard>
                   <Suspense
@@ -462,7 +464,7 @@ function App() {
             !statusLoaded ? (
               <Loading />
             ) : gamesEnabled &&
-              statusState?.status?.game_three_enabled === true ? (
+              statusState?.status?.game_three_enabled !== false ? (
               <PrivateRoute>
                 <GameBrowserGuard>
                   <Suspense
@@ -470,6 +472,50 @@ function App() {
                     key={location.pathname}
                   >
                     <QuotaTreasure />
+                  </Suspense>
+                </GameBrowserGuard>
+              </PrivateRoute>
+            ) : (
+              <NotFound />
+            )
+          }
+        />
+        <Route
+          path='/games/dice-21'
+          element={
+            !statusLoaded ? (
+              <Loading />
+            ) : gamesEnabled &&
+              statusState?.status?.game_four_enabled !== false ? (
+              <PrivateRoute>
+                <GameBrowserGuard>
+                  <Suspense
+                    fallback={<Loading></Loading>}
+                    key={location.pathname}
+                  >
+                    <Dice21 />
+                  </Suspense>
+                </GameBrowserGuard>
+              </PrivateRoute>
+            ) : (
+              <NotFound />
+            )
+          }
+        />
+        <Route
+          path='/games/quota-niuniu'
+          element={
+            !statusLoaded ? (
+              <Loading />
+            ) : gamesEnabled &&
+              statusState?.status?.game_five_enabled !== false ? (
+              <PrivateRoute>
+                <GameBrowserGuard>
+                  <Suspense
+                    fallback={<Loading></Loading>}
+                    key={location.pathname}
+                  >
+                    <QuotaNiuniu />
                   </Suspense>
                 </GameBrowserGuard>
               </PrivateRoute>

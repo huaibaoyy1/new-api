@@ -230,3 +230,21 @@ func GameTreasureRateLimit() func(c *gin.Context) {
 	}
 	return userRateLimitFactory(common.GameTreasureRateLimitNum, common.GameTreasureRateLimitDuration, "GT")
 }
+
+// GameDice21RateLimit returns a per-user rate limiter for dice 21 endpoints.
+// Configurable via GAME_DICE21_RATE_LIMIT_ENABLE / GAME_DICE21_RATE_LIMIT / GAME_DICE21_RATE_LIMIT_DURATION.
+func GameDice21RateLimit() func(c *gin.Context) {
+	if !common.GameDice21RateLimitEnable {
+		return defNext
+	}
+	return userRateLimitFactory(common.GameDice21RateLimitNum, common.GameDice21RateLimitDuration, "D21")
+}
+
+// GameNiuniuRateLimit returns a per-user rate limiter for quota niuniu endpoints.
+// Configurable via GAME_NIUNIU_RATE_LIMIT_ENABLE / GAME_NIUNIU_RATE_LIMIT / GAME_NIUNIU_RATE_LIMIT_DURATION.
+func GameNiuniuRateLimit() func(c *gin.Context) {
+	if !common.GameNiuniuRateLimitEnable {
+		return defNext
+	}
+	return userRateLimitFactory(common.GameNiuniuRateLimitNum, common.GameNiuniuRateLimitDuration, "NN")
+}

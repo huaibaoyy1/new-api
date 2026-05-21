@@ -23,4 +23,20 @@ export const gamesRegistry = [
     status: 'available',
     path: '/games/quota-treasure',
   },
+  {
+    key: 'dice-21',
+    enabledField: 'game_four_enabled',
+    title: '骰盅21',
+    description: '摇动暗盅接近 21 点，可重摇一次后与庄家比点。',
+    status: 'available',
+    path: '/games/dice-21',
+  },
+  {
+    key: 'quota-niuniu',
+    enabledField: 'game_five_enabled',
+    title: '额度斗牛',
+    description: '3/5 人桌模拟斗牛，支持庄家模式和抢庄模式。',
+    status: 'available',
+    path: '/games/quota-niuniu',
+  },
 ];

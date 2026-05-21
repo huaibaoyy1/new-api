@@ -208,6 +208,16 @@ var (
 	GameTreasureRateLimitEnable         = true
 	GameTreasureRateLimitNum            = 60
 	GameTreasureRateLimitDuration int64 = 60
+
+	// Per-user dice 21 rate limit (applies after authentication, keyed by user ID)
+	GameDice21RateLimitEnable         = true
+	GameDice21RateLimitNum            = 60
+	GameDice21RateLimitDuration int64 = 60
+
+	// Per-user quota niuniu rate limit (applies after authentication, keyed by user ID)
+	GameNiuniuRateLimitEnable         = true
+	GameNiuniuRateLimitNum            = 60
+	GameNiuniuRateLimitDuration int64 = 60
 )
 
 var RateLimitKeyExpirationDuration = 20 * time.Minute

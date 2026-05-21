@@ -3787,6 +3787,17 @@
     "见上方动态计费详情": "See dynamic pricing details above",
     "含时间条件": "Time rules",
     "含请求条件": "Request rules",
-    "（当前仅支持易支付接口，默认使用上方服务器地址作为回调地址！）": "(Currently only supports Epay interface, the default callback address is the server address above!)"
+    "（当前仅支持易支付接口，默认使用上方服务器地址作为回调地址！）": "(Currently only supports Epay interface, the default callback address is the server address above!)",
+    "待开牌": "Waiting to reveal",
+    "自己": "Me",
+    "本局结果": "Round result",
+    "今日次数": "Today plays",
+    "今日净额": "Today net",
+    "救助已领取": "Relief claimed",
+    "领取救助资金": "Claim relief funds",
+    "今日救助已领取": "Today relief claimed",
+    "救助门槛": "Relief threshold",
+    "领取救助资金失败": "Failed to claim relief funds",
+    "救助资金已领取": "Relief funds claimed"
   }
 }

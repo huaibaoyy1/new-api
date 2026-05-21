@@ -30,7 +30,7 @@ var goldenPokerRules = []string{
 	"开局后可直接比牌，也可免费换 1 张牌；每局最多换 1 次。",
 	"牌型从高到低为：豹子、顺金、金花、顺子、对子、单张。",
 	"同牌型按点数比较，完全相同庄家胜。",
-	"玩家胜利按牌型倍率获得站内余额，单局最高派奖 50 站内余额。",
+	"倍率：单张 1.35、对子 1.6、顺子 2.2、金花 2.8、顺金 4.2、豹子 5，单局最高派奖 50 站内余额。",
 }
 
 type GamePokerRound struct {
@@ -96,6 +96,7 @@ type GoldenPokerStatus struct {
 	Rules         []string               `json:"rules"`
 	MaxPayout     int                    `json:"max_payout"`
 	HandMultiples map[string]float64     `json:"hand_multiples"`
+	DailyLimit    GameDailyLimitView     `json:"daily_limit"`
 }
 
 func IsGoldenPokerEnabled() bool {
@@ -141,6 +142,10 @@ func GetGoldenPokerStatus(userId int) (*GoldenPokerStatus, error) {
 		}
 		recent = append(recent, *view)
 	}
+	dailyLimit, err := GetGameDailyLimit(userId)
+	if err != nil {
+		return nil, err
+	}
 
 	return &GoldenPokerStatus{
 		Enabled:       IsGoldenPokerEnabled(),
@@ -154,6 +159,7 @@ func GetGoldenPokerStatus(userId int) (*GoldenPokerStatus, error) {
 		Rules:         goldenPokerRules,
 		MaxPayout:     GoldenPokerMaxPayoutAmount,
 		HandMultiples: goldenPokerMultipliers(),
+		DailyLimit:    dailyLimit,
 	}, nil
 }
 
@@ -172,6 +178,11 @@ func CreateGoldenPokerRound(userId int, betAmount int) (*GoldenPokerRoundView, e
 			return errors.New("已有未结算牌局，请先完成当前牌局")
 		}
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
+		dailyState, err := ensureGameDailyPlayAvailable(tx, userId)
+		if err != nil {
 			return err
 		}
 
@@ -207,6 +218,10 @@ func CreateGoldenPokerRound(userId int, betAmount int) (*GoldenPokerRoundView, e
 			PlayerHandType: playerHand.Type,
 		}
 		if err := tx.Create(&round).Error; err != nil {
+			return err
+		}
+		recordGameDailyPlay(dailyState, -betQuota)
+		if err := tx.Save(dailyState).Error; err != nil {
 			return err
 		}
 		if err := tx.Save(&user).Error; err != nil {
@@ -329,6 +344,9 @@ func SettleGoldenPokerRound(userId int, roundId int) (*GoldenPokerRoundView, err
 			payoutAmount = calculateGoldenPokerPayout(round.BetAmount, playerHand.Type)
 			payoutQuota = amountToQuota(payoutAmount)
 			user.Quota += payoutQuota
+			if err := recordGameDailyNetQuota(tx, userId, payoutQuota); err != nil {
+				return err
+			}
 			resultText = GoldenPokerResultWin
 		}
 
@@ -389,11 +407,11 @@ func isGoldenPokerBetAmountAllowed(amount int) bool {
 
 func goldenPokerMultipliers() map[string]float64 {
 	return map[string]float64{
-		"single":         1.15,
-		"pair":           1.45,
-		"straight":       2.0,
-		"flush":          2.6,
-		"straight_flush": 4.0,
+		"single":         1.35,
+		"pair":           1.6,
+		"straight":       2.2,
+		"flush":          2.8,
+		"straight_flush": 4.2,
 		"triple":         5.0,
 	}
 }
@@ -478,47 +496,15 @@ func drawGoldenPokerReplacement(used []GoldenPokerCard) GoldenPokerCard {
 
 func strengthenGoldenPokerDealerCards(dealerCards []GoldenPokerCard, playerCards []GoldenPokerCard) []GoldenPokerCard {
 	dealerHand := evaluateGoldenPokerHand(dealerCards)
-	replaceIndex := -1
-	switch dealerHand.Type {
-	case "single":
-		replaceIndex = weakestGoldenPokerCardIndex(dealerCards)
-	case "pair":
-		pairRank := goldenPokerPairRank(dealerCards)
-		if pairRank > 0 && pairRank <= 10 {
-			replaceIndex = goldenPokerKickerIndex(dealerCards, pairRank)
-		}
-	}
-	if replaceIndex < 0 {
+	if dealerHand.Type != "single" || dealerHand.TieBreakers[0] > 10 {
 		return dealerCards
 	}
-
+	replaceIndex := weakestGoldenPokerCardIndex(dealerCards)
 	used := append([]GoldenPokerCard{}, playerCards...)
 	used = append(used, dealerCards...)
 	dealerCards = append([]GoldenPokerCard{}, dealerCards...)
 	dealerCards[replaceIndex] = drawGoldenPokerReplacement(used)
 	return dealerCards
-}
-
-func goldenPokerPairRank(cards []GoldenPokerCard) int {
-	counts := map[int]int{}
-	for _, card := range cards {
-		counts[card.Rank]++
-	}
-	for rank, count := range counts {
-		if count == 2 {
-			return rank
-		}
-	}
-	return 0
-}
-
-func goldenPokerKickerIndex(cards []GoldenPokerCard, pairRank int) int {
-	for index, card := range cards {
-		if card.Rank != pairRank {
-			return index
-		}
-	}
-	return -1
 }
 
 func weakestGoldenPokerCardIndex(cards []GoldenPokerCard) int {

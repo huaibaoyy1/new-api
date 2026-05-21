@@ -22,13 +22,13 @@ const (
 	QuotaTreasureResultFailed    = "failed"
 
 	QuotaTreasureMaxLayer        = 7
-	QuotaTreasureNodeCount       = 4
+	QuotaTreasureNodeCount       = 3
 	QuotaTreasureMaxPayoutAmount = 50
 )
 
 var quotaTreasureBetAmounts = []int{1, 5, 10}
-var quotaTreasureMultipliers = []float64{1.15, 1.35, 1.6, 2.0, 2.6, 3.6, 5.0}
-var quotaTreasureSuccessRates = []int{72, 62, 52, 42, 34, 26, 18}
+var quotaTreasureMultipliers = []float64{1.35, 1.55, 1.85, 2.5, 3.35, 4.0, 5.0}
+var quotaTreasureSuccessRates = []int{86, 76, 66, 58, 48, 39, 29}
 
 var quotaTreasureRoll = func(layer int, position int) bool {
 	successRate := quotaTreasureSuccessRates[layer-1]
@@ -37,7 +37,8 @@ var quotaTreasureRoll = func(layer int, position int) bool {
 
 var quotaTreasureRules = []string{
 	"选择 1、5 或 10 站内余额入场，进入 7 层额度遗迹。",
-	"每层从 4 个隐藏节点中选择 1 个，成功可继续探宝或带走当前奖励。",
+	"每层从 3 个隐藏节点中选择 1 个，成功可继续探宝或带走当前奖励。",
+	"层级倍率：1.35 / 1.55 / 1.85 / 2.5 / 3.35 / 4 / 5，越往后层风险越高、奖励越高。",
 	"探宝失败时本局结束，不返还入场额。",
 	"第 7 层成功后自动结算奖励，单局最高派奖 50 站内余额。",
 }
@@ -100,6 +101,7 @@ type QuotaTreasureStatus struct {
 	MaxPayout    int                      `json:"max_payout"`
 	Multipliers  []float64                `json:"multipliers"`
 	NodeCount    int                      `json:"node_count"`
+	DailyLimit   GameDailyLimitView       `json:"daily_limit"`
 }
 
 func IsQuotaTreasureEnabled() bool {
@@ -145,6 +147,10 @@ func GetQuotaTreasureStatus(userId int) (*QuotaTreasureStatus, error) {
 		}
 		recent = append(recent, *view)
 	}
+	dailyLimit, err := GetGameDailyLimit(userId)
+	if err != nil {
+		return nil, err
+	}
 
 	return &QuotaTreasureStatus{
 		Enabled:      IsQuotaTreasureEnabled(),
@@ -160,6 +166,7 @@ func GetQuotaTreasureStatus(userId int) (*QuotaTreasureStatus, error) {
 		MaxPayout:    QuotaTreasureMaxPayoutAmount,
 		Multipliers:  quotaTreasureMultipliers,
 		NodeCount:    QuotaTreasureNodeCount,
+		DailyLimit:   dailyLimit,
 	}, nil
 }
 
@@ -178,6 +185,11 @@ func CreateQuotaTreasureRound(userId int, betAmount int) (*QuotaTreasureRoundVie
 			return errors.New("已有未结束探宝，请先完成当前探宝")
 		}
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
+		dailyState, err := ensureGameDailyPlayAvailable(tx, userId)
+		if err != nil {
 			return err
 		}
 
@@ -204,6 +216,10 @@ func CreateQuotaTreasureRound(userId int, betAmount int) (*QuotaTreasureRoundVie
 			Steps:     stepsJSON,
 		}
 		if err := tx.Create(&round).Error; err != nil {
+			return err
+		}
+		recordGameDailyPlay(dailyState, -betQuota)
+		if err := tx.Save(dailyState).Error; err != nil {
 			return err
 		}
 		if err := tx.Save(&user).Error; err != nil {
@@ -275,6 +291,9 @@ func PickQuotaTreasureNode(userId int, roundId int, position int) (*QuotaTreasur
 				round.PayoutQuota = amountToQuota(step.PayoutAmount)
 				round.SettledAt = common.GetTimestamp()
 				user.Quota += round.PayoutQuota
+				if err := recordGameDailyNetQuota(tx, userId, round.PayoutQuota); err != nil {
+					return err
+				}
 				if err := tx.Save(&user).Error; err != nil {
 					return err
 				}
@@ -349,6 +368,9 @@ func CashoutQuotaTreasureRound(userId int, roundId int) (*QuotaTreasureRoundView
 		round.PayoutQuota = amountToQuota(round.PayoutAmount)
 		round.SettledAt = common.GetTimestamp()
 		user.Quota += round.PayoutQuota
+		if err := recordGameDailyNetQuota(tx, userId, round.PayoutQuota); err != nil {
+			return err
+		}
 		if err := tx.Save(round).Error; err != nil {
 			return err
 		}

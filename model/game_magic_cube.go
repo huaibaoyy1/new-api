@@ -131,6 +131,7 @@ type MagicCubeStatus struct {
 	ExchangeItems         []MagicCubeExchangeItemConfig `json:"exchange_items"`
 	RecentLogs            []GameDrawLog                 `json:"recent_logs"`
 	Rules                 []string                      `json:"rules"`
+	DailyLimit            GameDailyLimitView            `json:"daily_limit"`
 }
 
 type MagicCubeMilestoneView struct {
@@ -373,6 +374,10 @@ func GetMagicCubeStatus(userId int) (*MagicCubeStatus, error) {
 	if remainingSeconds < 0 {
 		remainingSeconds = 0
 	}
+	dailyLimit, err := GetGameDailyLimit(userId)
+	if err != nil {
+		return nil, err
+	}
 
 	return &MagicCubeStatus{
 		Enabled:               IsMagicCubeEnabled(),
@@ -396,6 +401,7 @@ func GetMagicCubeStatus(userId int) (*MagicCubeStatus, error) {
 		ExchangeItems:         magicCubeExchangeItems,
 		RecentLogs:            recentLogs,
 		Rules:                 magicCubeRules,
+		DailyLimit:            dailyLimit,
 	}, nil
 }
 
@@ -407,6 +413,10 @@ func DrawMagicCube(userId int, count int) (*MagicCubeDrawResult, error) {
 	var result MagicCubeDrawResult
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		stat, err := getOrCreateGameUserStat(tx, userId, GameKeyMagicCube)
+		if err != nil {
+			return err
+		}
+		dailyState, err := ensureGameDailyPlayAvailable(tx, userId)
 		if err != nil {
 			return err
 		}
@@ -424,6 +434,7 @@ func DrawMagicCube(userId int, count int) (*MagicCubeDrawResult, error) {
 		user.Quota -= drawCostQuota
 
 		rewards := make([]GameDrawLog, 0, count)
+		dailyNetQuota := -drawCostQuota
 		for i := 0; i < count; i++ {
 			stat.TotalDraws++
 			if stat.PityProgress < MagicCubePityCount {
@@ -442,6 +453,9 @@ func DrawMagicCube(userId int, count int) (*MagicCubeDrawResult, error) {
 
 			if _, _, err := applyMagicCubeReward(tx, stat, &user, reward); err != nil {
 				return err
+			}
+			if reward.Type == GameRewardTypeBalance || reward.Type == GameRewardTypeQuota {
+				dailyNetQuota += resolveMagicCubeBalanceRewardQuota(reward)
 			}
 
 			logItem := GameDrawLog{
@@ -463,6 +477,10 @@ func DrawMagicCube(userId int, count int) (*MagicCubeDrawResult, error) {
 			return err
 		}
 		if err := tx.Save(stat).Error; err != nil {
+			return err
+		}
+		recordGameDailyPlay(dailyState, dailyNetQuota)
+		if err := tx.Save(dailyState).Error; err != nil {
 			return err
 		}
 
@@ -685,10 +703,10 @@ func rollMagicCubeReward() MagicCubeRewardConfig {
 	n := rand.Intn(10000)
 	switch {
 	case n < 4500:
-		amount := 1 + rand.Intn(3)
+		amount := 2 + rand.Intn(4)
 		return MagicCubeRewardConfig{Type: GameRewardTypeRegisterFrag, Name: fmt.Sprintf("注册码碎片 x%d", amount), Amount: amount}
 	case n < 9000:
-		amount := 1 + rand.Intn(3)
+		amount := 2 + rand.Intn(4)
 		return MagicCubeRewardConfig{Type: GameRewardTypeConsumeFrag, Name: fmt.Sprintf("消费码碎片 x%d", amount), Amount: amount}
 	default:
 		rewardQuota, amount := randomMagicCubeBalanceReward()
@@ -825,11 +843,11 @@ func randomMagicCubeBalanceReward() (int, float64) {
 	var cents int
 	switch {
 	case n < 70:
-		cents = 20 + rand.Intn(21)
+		cents = 70 + rand.Intn(51)
 	case n < 90:
-		cents = 41 + rand.Intn(20)
+		cents = 121 + rand.Intn(60)
 	default:
-		cents = 61 + rand.Intn(20)
+		cents = 181 + rand.Intn(70)
 	}
 	amount := float64(cents) / 100
 	return amountToQuota(amount), amount

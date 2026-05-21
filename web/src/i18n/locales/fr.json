@@ -3642,6 +3642,17 @@
     "默认折叠侧边栏": "Réduire la barre latérale par défaut",
     "默认测试模型": "Modèle de test par défaut",
     "默认用户消息": "Bonjour",
-    "默认补全倍率": "Taux de complétion par défaut"
+    "默认补全倍率": "Taux de complétion par défaut",
+    "待开牌": "À révéler",
+    "自己": "Moi",
+    "本局结果": "Résultat",
+    "今日次数": "Parties du jour",
+    "今日净额": "Net du jour",
+    "救助已领取": "Aide déjà reçue",
+    "领取救助资金": "Recevoir l’aide",
+    "今日救助已领取": "Aide du jour reçue",
+    "救助门槛": "Seuil d’aide",
+    "领取救助资金失败": "Échec de la demande d’aide",
+    "救助资金已领取": "Aide reçue"
   }
 }

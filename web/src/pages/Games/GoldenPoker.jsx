@@ -32,12 +32,13 @@ import { IconHistory, IconRefresh, IconTickCircle } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { API, showError, showSuccess, showWarning } from '../../helpers';
 import GameQuickSwitch from '../../components/games/GameQuickSwitch';
+import GameDailyLimitPanel from '../../components/games/GameDailyLimitPanel';
 
 const { Title, Text, Paragraph } = Typography;
 
 const suitMap = {
   spade: { label: '黑桃', symbol: '♠', color: 'text-slate-950' },
-  heart: { label: '红桃', symbol: '♥', color: 'text-red-600' },
+  heart: { label: '红心', symbol: '♥', color: 'text-red-600' },
   club: { label: '梅花', symbol: '♣', color: 'text-slate-950' },
   diamond: { label: '方块', symbol: '♦', color: 'text-red-600' },
 };
@@ -119,12 +120,21 @@ const CardFace = ({ card, hidden = false, index = 0, reveal = false }) => {
   const suit = suitMap[card?.suit] || suitMap.spade;
   return (
     <div
-      className={`relative flex h-28 w-20 flex-col justify-between overflow-hidden rounded-2xl border-2 border-amber-100 bg-[#fffaf0] p-3 shadow-[0_14px_24px_rgba(0,0,0,0.32)] ${animationClass}`}
+      className={`relative flex h-28 w-20 flex-col justify-between overflow-hidden rounded-2xl border-2 border-amber-100 bg-[#fffaf0] p-2 shadow-[0_14px_24px_rgba(0,0,0,0.32)] ${animationClass}`}
       style={style}
+      aria-label={`${suit.label}${formatRank(card?.rank)}`}
     >
-      <div className={`text-xl font-black ${suit.color}`}>{formatRank(card?.rank)}</div>
-      <div className={`text-center text-3xl ${suit.color}`}>{suit.symbol}</div>
-      <div className={`self-end text-xl font-black ${suit.color}`}>{formatRank(card?.rank)}</div>
+      <div className={`flex items-center justify-between text-base font-black ${suit.color}`}>
+        <span>{formatRank(card?.rank)}</span>
+        <span>{suit.symbol}</span>
+      </div>
+      <div className={`text-center ${suit.color}`}>
+        <div className='text-4xl leading-none'>{suit.symbol}</div>
+        <div className='mt-1 rounded-full bg-white/80 px-1 text-[11px] font-black'>
+          {suit.label}
+        </div>
+      </div>
+      <div className={`self-end text-base font-black ${suit.color}`}>{formatRank(card?.rank)}</div>
     </div>
   );
 };
@@ -166,6 +176,7 @@ const GoldenPoker = () => {
   const [activeRound, setActiveRound] = useState(null);
   const [selectedBet, setSelectedBet] = useState(1);
   const [acting, setActing] = useState(false);
+  const [reliefClaiming, setReliefClaiming] = useState(false);
   const [historyVisible, setHistoryVisible] = useState(false);
 
   const loadStatus = async ({ syncActiveRound = true } = {}) => {
@@ -188,6 +199,24 @@ const GoldenPoker = () => {
       showError(error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const claimRelief = async () => {
+    setReliefClaiming(true);
+    try {
+      const res = await API.post('/api/games/relief/claim');
+      const { success, message } = res.data || {};
+      if (!success) {
+        showError(message || t('领取救助资金失败'));
+        return;
+      }
+      showSuccess(t('救助资金已领取'));
+      await loadStatus({ syncActiveRound: false });
+    } catch (error) {
+      showError(error);
+    } finally {
+      setReliefClaiming(false);
     }
   };
 
@@ -259,7 +288,11 @@ const GoldenPoker = () => {
     loadStatus();
   }, []);
 
-  const canStart = Number(status?.user_balance || 0) >= selectedBet && !activeRound;
+  const dailyRemaining = Number(status?.daily_limit?.remaining_count ?? 1);
+  const canStart =
+    Number(status?.user_balance || 0) >= selectedBet &&
+    dailyRemaining > 0 &&
+    !activeRound;
 
   if (loading && !status) {
     return (
@@ -297,6 +330,14 @@ const GoldenPoker = () => {
         </div>
 
         <GameQuickSwitch currentKey='golden-poker' className='mb-6' />
+
+        <GameDailyLimitPanel
+          dailyLimit={status?.daily_limit}
+          onClaim={claimRelief}
+          claiming={reliefClaiming}
+          dark
+          className='mb-6 relative z-10'
+        />
 
         <div className='mb-6 grid grid-cols-1 gap-5 lg:grid-cols-3'>
           <Card
@@ -357,7 +398,7 @@ const GoldenPoker = () => {
                         theme='solid'
                         type='warning'
                         loading={acting}
-                        disabled={Number(status?.user_balance || 0) < selectedBet}
+                        disabled={Number(status?.user_balance || 0) < selectedBet || dailyRemaining <= 0}
                         onClick={createRound}
                       >
                         {t('再来一局')}

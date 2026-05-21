@@ -321,6 +321,10 @@ func SetApiRouter(router *gin.Engine) {
 		gamesRoute := apiRouter.Group("/games")
 		gamesRoute.Use(middleware.UserAuth(), middleware.FormalUserRequired())
 		{
+			reliefRoute := gamesRoute.Group("/relief")
+			{
+				reliefRoute.POST("/claim", middleware.CriticalRateLimit(), controller.ClaimGameRelief)
+			}
 			magicCubeRoute := gamesRoute.Group("/magic-cube")
 			{
 				magicCubeRoute.GET("/status", controller.GetMagicCubeStatus)
@@ -342,6 +346,19 @@ func SetApiRouter(router *gin.Engine) {
 				quotaTreasureRoute.POST("/rounds", middleware.GameTreasureRateLimit(), controller.CreateQuotaTreasureRound)
 				quotaTreasureRoute.POST("/rounds/:id/pick", middleware.GameTreasureRateLimit(), controller.PickQuotaTreasureNode)
 				quotaTreasureRoute.POST("/rounds/:id/cashout", middleware.GameTreasureRateLimit(), controller.CashoutQuotaTreasureRound)
+			}
+			dice21Route := gamesRoute.Group("/dice-21")
+			{
+				dice21Route.GET("/status", controller.GetDice21Status)
+				dice21Route.POST("/rounds", middleware.GameDice21RateLimit(), controller.CreateDice21Round)
+				dice21Route.POST("/rounds/:id/reroll", middleware.GameDice21RateLimit(), controller.RerollDice21Round)
+				dice21Route.POST("/rounds/:id/settle", middleware.GameDice21RateLimit(), controller.SettleDice21Round)
+			}
+			quotaNiuniuRoute := gamesRoute.Group("/quota-niuniu")
+			{
+				quotaNiuniuRoute.GET("/status", controller.GetQuotaNiuniuStatus)
+				quotaNiuniuRoute.POST("/rounds", middleware.GameNiuniuRateLimit(), controller.CreateQuotaNiuniuRound)
+				quotaNiuniuRoute.POST("/rounds/:id/settle", middleware.GameNiuniuRateLimit(), controller.SettleQuotaNiuniuRound)
 			}
 		}
 

@@ -64,6 +64,8 @@ const PageLayout = () => {
     '/games/magic-cube',
     '/games/golden-poker',
     '/games/quota-treasure',
+    '/games/dice-21',
+    '/games/quota-niuniu',
   ];
 
   const shouldHideFooter = cardProPages.includes(location.pathname);

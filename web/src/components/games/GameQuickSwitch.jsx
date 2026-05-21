@@ -13,6 +13,10 @@ const themeClassMap = {
     '!border-emerald-300/70 !bg-[linear-gradient(135deg,#d9f99d_0%,#34d399_100%)] hover:!bg-[linear-gradient(135deg,#bef264_0%,#10b981_100%)]',
   'quota-treasure':
     '!border-cyan-300/80 !bg-[linear-gradient(135deg,#cffafe_0%,#38bdf8_100%)] hover:!bg-[linear-gradient(135deg,#a5f3fc_0%,#0ea5e9_100%)]',
+  'dice-21':
+    '!border-orange-300/80 !bg-[linear-gradient(135deg,#ffedd5_0%,#fb923c_100%)] hover:!bg-[linear-gradient(135deg,#fed7aa_0%,#f97316_100%)]',
+  'quota-niuniu':
+    '!border-red-300/80 !bg-[linear-gradient(135deg,#fee2e2_0%,#f87171_100%)] hover:!bg-[linear-gradient(135deg,#fecaca_0%,#ef4444_100%)]',
 };
 
 const GameQuickSwitch = ({ currentKey, className = '' }) => {
@@ -25,7 +29,7 @@ const GameQuickSwitch = ({ currentKey, className = '' }) => {
       gamesRegistry.filter(
         (game) =>
           game.key !== currentKey &&
-          statusState?.status?.[game.enabledField] === true,
+          statusState?.status?.[game.enabledField] !== false,
       ),
     [currentKey, statusState?.status],
   );

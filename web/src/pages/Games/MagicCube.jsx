@@ -39,6 +39,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { API, copy, showError, showSuccess } from '../../helpers';
 import GameQuickSwitch from '../../components/games/GameQuickSwitch';
+import GameDailyLimitPanel from '../../components/games/GameDailyLimitPanel';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -105,6 +106,7 @@ const MagicCube = () => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [drawing, setDrawing] = useState(false);
+  const [reliefClaiming, setReliefClaiming] = useState(false);
   const [claimingDraws, setClaimingDraws] = useState(null);
   const [exchangingId, setExchangingId] = useState(null);
   const [status, setStatus] = useState(null);
@@ -143,6 +145,24 @@ const MagicCube = () => {
       showError(error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const claimRelief = async () => {
+    setReliefClaiming(true);
+    try {
+      const res = await API.post('/api/games/relief/claim');
+      const { success, message } = res.data || {};
+      if (!success) {
+        showError(message || t('领取救助资金失败'));
+        return;
+      }
+      showSuccess(t('救助资金已领取'));
+      await loadStatus();
+    } catch (error) {
+      showError(error);
+    } finally {
+      setReliefClaiming(false);
     }
   };
 
@@ -303,14 +323,16 @@ const MagicCube = () => {
     return <Tag color={meta.color}>{t(meta.label)}</Tag>;
   };
 
-  const canDraw = (count) => Number(status?.user_balance || 0) >= count;
+  const dailyRemaining = Number(status?.daily_limit?.remaining_count ?? 1);
+  const canDraw = (count) =>
+    Number(status?.user_balance || 0) >= count && dailyRemaining > 0;
   const treasureRewards = [
     { title: '幸运魔方', detail: 'x1', type: 'cube' },
-    { title: '注册码碎片', detail: 'x1 - x3', type: 'register_fragment' },
-    { title: '消费码碎片', detail: 'x1 - x3', type: 'consume_fragment' },
+    { title: '注册码碎片', detail: 'x2 - x5', type: 'register_fragment' },
+    { title: '消费码碎片', detail: 'x2 - x5', type: 'consume_fragment' },
     { title: '站内余额', detail: '随机', type: 'balance' },
-    { title: '注册码碎片', detail: 'x1 - x3', type: 'register_fragment' },
-    { title: '消费码碎片', detail: 'x1 - x3', type: 'consume_fragment' },
+    { title: '注册码碎片', detail: 'x2 - x5', type: 'register_fragment' },
+    { title: '消费码碎片', detail: 'x2 - x5', type: 'consume_fragment' },
     { title: '站内余额', detail: '随机', type: 'balance' },
     { title: '幸运魔方', detail: 'x1', type: 'cube' },
   ];
@@ -422,6 +444,13 @@ const MagicCube = () => {
         </div>
 
         <GameQuickSwitch currentKey='magic-cube' className='mb-6' />
+
+        <GameDailyLimitPanel
+          dailyLimit={status?.daily_limit}
+          onClaim={claimRelief}
+          claiming={reliefClaiming}
+          className='mb-6'
+        />
 
         <div className='mb-6 grid grid-cols-1 items-stretch gap-5 xl:h-[650px] xl:grid-cols-[280px_minmax(520px,1fr)_600px]'>
           <Card

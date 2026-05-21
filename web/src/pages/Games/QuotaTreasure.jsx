@@ -28,6 +28,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { API, showError, showSuccess, showWarning } from '../../helpers';
 import GameQuickSwitch from '../../components/games/GameQuickSwitch';
+import GameDailyLimitPanel from '../../components/games/GameDailyLimitPanel';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -36,7 +37,7 @@ const mutedText = { color: 'rgba(248, 251, 255, 0.72)' };
 const darkTitleText = { color: '#082f49' };
 const darkBodyText = { color: '#0f3a4d' };
 const cardBodyStyle = { background: 'transparent', padding: 0 };
-const nodeLabels = ['星门', '秘径', '回廊', '灯塔'];
+const nodeLabels = ['星门', '秘径', '回廊'];
 const layerNames = [
   '启程门',
   '流光廊',
@@ -119,7 +120,7 @@ const LayerRail = ({ round, maxLayer = 5 }) => {
 
 const NodePicker = ({ disabled, acting, onPick }) => {
   return (
-    <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4'>
+    <div className='grid grid-cols-1 gap-3 sm:grid-cols-3'>
       {nodeLabels.map((label, index) => (
         <button
           key={label}
@@ -145,6 +146,7 @@ const QuotaTreasure = () => {
   const [activeRound, setActiveRound] = useState(null);
   const [selectedBet, setSelectedBet] = useState(1);
   const [acting, setActing] = useState(false);
+  const [reliefClaiming, setReliefClaiming] = useState(false);
   const [historyVisible, setHistoryVisible] = useState(false);
 
   const loadStatus = async () => {
@@ -165,6 +167,24 @@ const QuotaTreasure = () => {
       showError(error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const claimRelief = async () => {
+    setReliefClaiming(true);
+    try {
+      const res = await API.post('/api/games/relief/claim');
+      const { success, message } = res.data || {};
+      if (!success) {
+        showError(message || t('领取救助资金失败'));
+        return;
+      }
+      showSuccess(t('救助资金已领取'));
+      await loadStatus();
+    } catch (error) {
+      showError(error);
+    } finally {
+      setReliefClaiming(false);
     }
   };
 
@@ -244,7 +264,11 @@ const QuotaTreasure = () => {
     loadStatus();
   }, []);
 
-  const canStart = Number(status?.user_balance || 0) >= selectedBet && !activeRound;
+  const dailyRemaining = Number(status?.daily_limit?.remaining_count ?? 1);
+  const canStart =
+    Number(status?.user_balance || 0) >= selectedBet &&
+    dailyRemaining > 0 &&
+    !activeRound;
   const currentLayer = activeRound?.current_layer || 0;
   const nextLayer = Math.min(currentLayer + 1, status?.max_layer || 7);
   const settled = activeRound && activeRound.status !== 'playing';
@@ -265,7 +289,7 @@ const QuotaTreasure = () => {
         <div className='mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between'>
           <div>
             <div className='mb-3 inline-flex rounded-full border border-cyan-100/60 bg-cyan-300/15 px-4 py-1 text-sm font-semibold text-cyan-50'>
-              {t('七层遗迹 · 四道秘门 · 后段高倍率')}
+              {t('七层遗迹 · 三道秘门 · 后段高倍率')}
             </div>
             <Title heading={2} className='!mb-2' style={lightText}>
               {t('额度探宝')}
@@ -285,6 +309,14 @@ const QuotaTreasure = () => {
         </div>
 
         <GameQuickSwitch currentKey='quota-treasure' className='mb-6' />
+
+        <GameDailyLimitPanel
+          dailyLimit={status?.daily_limit}
+          onClaim={claimRelief}
+          claiming={reliefClaiming}
+          dark
+          className='mb-6 relative z-10'
+        />
 
         <div className='mb-6 grid grid-cols-1 items-stretch gap-5 lg:grid-cols-3 xl:h-[640px]'>
           <Card
@@ -379,7 +411,7 @@ const QuotaTreasure = () => {
                         theme='solid'
                         type='warning'
                         loading={acting}
-                        disabled={Number(status?.user_balance || 0) < selectedBet}
+                        disabled={Number(status?.user_balance || 0) < selectedBet || dailyRemaining <= 0}
                         onClick={createRound}
                       >
                         {t('再探一次')}

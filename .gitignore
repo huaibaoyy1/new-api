@@ -23,6 +23,7 @@ web/bun.lock
 plans
 .claude
 go-test/
+tmp
 
 electron/node_modules
 electron/dist

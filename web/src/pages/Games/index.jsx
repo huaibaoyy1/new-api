@@ -35,7 +35,7 @@ const Games = () => {
     () =>
       gamesRegistry.map((game) => ({
         ...game,
-        enabled: statusState?.status?.[game.enabledField] === true,
+        enabled: statusState?.status?.[game.enabledField] !== false,
       })),
     [statusState?.status],
   );
